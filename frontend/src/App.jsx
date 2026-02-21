@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import StudentPortal from './pages/StudentPortal';
 import LecturerPortal from './pages/LecturerPortal';
 import HODPortal from './pages/HODPortal';
+import TOPortal from './pages/TOPortal';
 
 // Import other portals as we build them...
 
@@ -43,8 +44,11 @@ const App = () => {
                 <HODPortal />
             </ProtectedRoute>
             } />
-
-
+            <Route path="/to-dashboard" element={
+              <ProtectedRoute allowedRole="technical_officer">
+                <TOPortal />
+              </ProtectedRoute>
+            } />
           {/* Future Routes */}
           {/* <Route path="/hod-dashboard" element={<ProtectedRoute allowedRole="hod"><HODPortal /></ProtectedRoute>} /> */}
           
