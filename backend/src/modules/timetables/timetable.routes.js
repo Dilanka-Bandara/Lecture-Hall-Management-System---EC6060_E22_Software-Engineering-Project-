@@ -30,4 +30,18 @@ router.post(
   timetableController.markAttendance
 );
 
+// --- NEW HOD ROUTES ---
+
+// HOD views all schedules
+router.get('/department/all', verifyToken, authorizeRoles('hod', 'admin'), timetableController.getDepartmentSchedules);
+
+// HOD creates a new schedule
+router.post('/department/new', verifyToken, authorizeRoles('hod', 'admin'), timetableController.addSchedule);
+
+// HOD deletes a schedule
+router.delete('/department/:id', verifyToken, authorizeRoles('hod', 'admin'), timetableController.removeSchedule);
+
+
+
+
 module.exports = router;
