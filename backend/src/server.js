@@ -11,10 +11,14 @@ app.use(express.json());
 // Import Routes
 const authRoutes = require('./modules/auth/auth.routes');
 const timetableRoutes = require('./modules/timetables/timetable.routes');
+const swapRoutes = require('./modules/swaps/swap.routes');
+const issueRoutes = require('./modules/issues/issue.routes');
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/timetables', timetableRoutes);
+app.use('/api/swaps', swapRoutes);
+app.use('/api/issues', issueRoutes);
 
 // Basic Health Check
 app.get('/', (req, res) => {
