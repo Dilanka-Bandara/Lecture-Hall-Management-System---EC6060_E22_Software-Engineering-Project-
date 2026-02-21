@@ -66,34 +66,41 @@ const submitAttendance = async (timetableId, attendanceData) => {
     is_present: record.is_present
   }));
 
+  // Insert records. If a record already exists, we ignore it (or you could use .onConflict().merge() to update it)
+  await db('attendance').insert(recordsToInsert).onConflict(['timetable_id', 'student_id']).merge();
+  
+  return { success: true, message: 'Attendance successfully recorded' };
+};
 
-  // Fetch all timetables across the whole department
-  const getAllSchedules = async () => {
-    return await db('timetables as t')
-      .join('subjects as s', 't.subject_id', 's.id')
-      .join('lecture_halls as h', 't.hall_id', 'h.id')
-      .join('users as l', 't.lecturer_id', 'l.id')
-      .select(
-        't.id', 't.date', 't.start_time', 't.end_time',
-        's.subject_code', 's.subject_name',
-        'h.name as hall_name', 'l.name as lecturer_name'
-      )
-      .orderBy('t.date', 'asc').orderBy('t.start_time', 'asc');
-  };
+// --- NEW HOD FUNCTIONS ---
 
-    // Create a brand new timetable record
-  const createSchedule = async (scheduleData) => {
-    const [newId] = await db('timetables').insert(scheduleData);
-    return { id: newId, ...scheduleData };
-  };
+// Fetch all timetables across the whole department
+const getAllSchedules = async () => {
+  return await db('timetables as t')
+    .join('subjects as s', 't.subject_id', 's.id')
+    .join('lecture_halls as h', 't.hall_id', 'h.id')
+    .join('users as l', 't.lecturer_id', 'l.id')
+    .select(
+      't.id', 't.date', 't.start_time', 't.end_time',
+      's.subject_code', 's.subject_name',
+      'h.name as hall_name', 'l.name as lecturer_name'
+    )
+    .orderBy('t.date', 'asc').orderBy('t.start_time', 'asc');
+};
 
-  // Delete a timetable record (e.g., class cancelled)
-  const deleteSchedule = async (id) => {
-    await db('timetables').where({ id }).del();
-    return { success: true, message: 'Schedule deleted successfully' };
-  };
+// Create a brand new timetable record
+const createSchedule = async (scheduleData) => {
+  const [newId] = await db('timetables').insert(scheduleData);
+  return { id: newId, ...scheduleData };
+};
 
-  // --- NEW STUDENT ATTENDANCE METRICS ---
+// Delete a timetable record (e.g., class cancelled)
+const deleteSchedule = async (id) => {
+  await db('timetables').where({ id }).del();
+  return { success: true, message: 'Schedule deleted successfully' };
+};
+
+// --- NEW STUDENT ATTENDANCE METRICS ---
 const getStudentAttendanceMetrics = async (studentId) => {
   // Fetch all attendance records for the student, linked to subject names
   const records = await db('attendance as a')
@@ -130,14 +137,6 @@ const getStudentAttendanceMetrics = async (studentId) => {
       percentage: percentage
     };
   });
-};
-
-
-
-  // Insert records. If a record already exists, we ignore it (or you could use .onConflict().merge() to update it)
-  await db('attendance').insert(recordsToInsert).onConflict(['timetable_id', 'student_id']).merge();
-  
-  return { success: true, message: 'Attendance successfully recorded' };
 };
 
 module.exports = {
