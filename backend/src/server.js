@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const adminRoutes = require('./modules/admin/admin.routes');
 const notificationRoutes = require('./modules/notifications/notification.routes');
+const systemRoutes = require('./modules/system/system.routes');
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use('/api/swaps', swapRoutes);
 app.use('/api/issues', issueRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/system', systemRoutes);
 
 // Basic Health Check
 app.get('/', (req, res) => {

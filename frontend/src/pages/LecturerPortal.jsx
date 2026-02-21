@@ -12,6 +12,9 @@ const LecturerPortal = () => {
   const [timetable, setTimetable] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  // Data States
+  const [systemData, setSystemData] = useState({ lecturers: [], halls: [], subjects: [] });
+  
   // Modal States
   const [isSwapModalOpen, setSwapModalOpen] = useState(false);
   const [isIssueModalOpen, setIssueModalOpen] = useState(false);
@@ -23,6 +26,7 @@ const LecturerPortal = () => {
 
   useEffect(() => {
     fetchTimetable();
+    fetchSystemData();
   }, []);
 
   const fetchTimetable = async () => {
@@ -36,6 +40,15 @@ const LecturerPortal = () => {
     }
   };
 
+  const fetchSystemData = async () => {
+    try {
+      const response = await api.get('/system/data');
+      setSystemData(response.data);
+    } catch (error) {
+      console.error("Failed to load system data", error);
+    }
+  };
+
   const showNotification = (message) => {
     setNotification(message);
     setTimeout(() => setNotification(null), 4000);
@@ -44,7 +57,8 @@ const LecturerPortal = () => {
   const handleIssueSubmit = async (e) => {
     e.preventDefault();
     try {
-      // In a real app, hall_id would come from a dropdown of actual halls
+      // In a real app, hall_id would come from a dropdown of actual halls. 
+      // Assuming it's hardcoded to 1 for this specific implementation example unless updated similarly to swaps.
       await api.post('/issues', { ...issueForm, hall_id: 1 }); 
       setIssueModalOpen(false);
       showNotification("Issue reported to Technical Officer successfully.");
@@ -57,9 +71,11 @@ const LecturerPortal = () => {
   const handleSwapSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/swaps', { ...swapForm, target_lecturer_id: 4, proposed_hall_id: 2 }); // Dummy IDs for testing
+      // Removed dummy IDs. It now uses the exact data selected from the dropdowns!
+      await api.post('/swaps', swapForm); 
       setSwapModalOpen(false);
       showNotification("Swap request sent to Lecturer and HOD for approval.");
+      setSwapForm({ timetable_id: '', target_lecturer_id: '', proposed_date: '', proposed_start_time: '', proposed_end_time: '', proposed_hall_id: '' });
     } catch (error) {
       alert("Failed to submit swap request");
     }
@@ -127,7 +143,7 @@ const LecturerPortal = () => {
           <div className="flex h-64 items-center justify-center text-slate-400 animate-pulse">Loading schedule...</div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-            {/* Schedule Column (Takes up 2/3 of the space on large screens) */}
+            {/* Schedule Column */}
             <div className="xl:col-span-2">
               <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
                 <Calendar className="w-6 h-6 mr-2 text-indigo-500"/> Upcoming Lectures
@@ -227,6 +243,29 @@ const LecturerPortal = () => {
                       {timetable.map(t => <option key={t.timetable_id} value={t.timetable_id}>{t.subject_code} - {t.date.split('T')[0]}</option>)}
                     </select>
                   </div>
+
+                  {/* NEW DYNAMIC DROPDOWN FOR LECTURER */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Target Lecturer</label>
+                    <select required value={swapForm.target_lecturer_id} onChange={e => setSwapForm({...swapForm, target_lecturer_id: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
+                      <option value="">Select Lecturer...</option>
+                      {systemData.lecturers.filter(l => l.id !== user?.id).map(l => (
+                        <option key={l.id} value={l.id}>{l.name} ({l.university_id})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* NEW DYNAMIC DROPDOWN FOR PROPOSED HALL */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Proposed Hall</label>
+                    <select required value={swapForm.proposed_hall_id} onChange={e => setSwapForm({...swapForm, proposed_hall_id: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
+                      <option value="">Select Room...</option>
+                      {systemData.halls.map(h => (
+                        <option key={h.id} value={h.id}>{h.name} (Cap: {h.capacity})</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Proposed Date</label>
                     <input type="date" required value={swapForm.proposed_date} onChange={e => setSwapForm({...swapForm, proposed_date: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />

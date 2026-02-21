@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import NotificationPanel from '../components/NotificationPanel';
 
 const HODPortal = () => {
   const { user, logout } = useAuth();
@@ -13,10 +14,12 @@ const HODPortal = () => {
   // Data States
   const [pendingSwaps, setPendingSwaps] = useState([]);
   const [allSchedules, setAllSchedules] = useState([]);
+  const [systemData, setSystemData] = useState({ lecturers: [], halls: [], subjects: [] });
   const [notification, setNotification] = useState(null);
   
-  // Modal State
+  // Modal & Panel States
   const [isScheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [isNotifPanelOpen, setIsNotifPanelOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({ 
     subject_id: '', lecturer_id: '', hall_id: '', date: '', start_time: '', end_time: '' 
   });
@@ -24,7 +27,17 @@ const HODPortal = () => {
   useEffect(() => {
     fetchPendingSwaps();
     fetchAllSchedules();
+    fetchSystemData();
   }, []);
+
+  const fetchSystemData = async () => {
+    try {
+      const response = await api.get('/system/data');
+      setSystemData(response.data);
+    } catch (error) {
+      console.error("Failed to load system data", error);
+    }
+  };
 
   const showNotification = (message) => {
     setNotification(message);
@@ -109,6 +122,12 @@ const HODPortal = () => {
           <nav className="p-4 space-y-2 mt-4">
             <button className="w-full flex items-center px-4 py-3 bg-emerald-500/10 text-emerald-400 rounded-xl font-medium">
               <ClipboardCheck className="w-5 h-5 mr-3" /> Control Panel
+            </button>
+            <button 
+              onClick={() => setIsNotifPanelOpen(true)} 
+              className="w-full flex items-center px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl font-medium transition-colors"
+            >
+              <Bell className="w-5 h-5 mr-3" /> Notifications
             </button>
           </nav>
         </div>
@@ -214,7 +233,7 @@ const HODPortal = () => {
         </div>
       </main>
 
-      {/* CREATE SCHEDULE MODAL */}
+      {/* CREATE SCHEDULE MODAL WITH DYNAMIC DROPDOWNS */}
       <AnimatePresence>
         {isScheduleModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
@@ -225,19 +244,34 @@ const HODPortal = () => {
               </div>
               <form onSubmit={handleCreateSchedule} className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Using our seeded DB IDs for demonstration */}
+                  
+                  {/* Dynamic Subject Dropdown */}
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Subject ID (e.g., 1 for CS201)</label>
-                    <input type="number" required value={scheduleForm.subject_id} onChange={e => setScheduleForm({...scheduleForm, subject_id: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" />
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Subject</label>
+                    <select required value={scheduleForm.subject_id} onChange={e => setScheduleForm({...scheduleForm, subject_id: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                      <option value="">Select Subject...</option>
+                      {systemData.subjects.map(s => <option key={s.id} value={s.id}>{s.subject_code} - {s.subject_name}</option>)}
+                    </select>
                   </div>
+                  
+                  {/* Dynamic Lecturer Dropdown */}
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Lecturer ID (e.g., 3 for Dr. Sarath)</label>
-                    <input type="number" required value={scheduleForm.lecturer_id} onChange={e => setScheduleForm({...scheduleForm, lecturer_id: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" />
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Lecturer</label>
+                    <select required value={scheduleForm.lecturer_id} onChange={e => setScheduleForm({...scheduleForm, lecturer_id: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                      <option value="">Assign Lecturer...</option>
+                      {systemData.lecturers.map(l => <option key={l.id} value={l.id}>{l.name} ({l.university_id})</option>)}
+                    </select>
                   </div>
+                  
+                  {/* Dynamic Hall Dropdown */}
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Hall ID (e.g., 1 for Hall 01)</label>
-                    <input type="number" required value={scheduleForm.hall_id} onChange={e => setScheduleForm({...scheduleForm, hall_id: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" />
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Lecture Hall</label>
+                    <select required value={scheduleForm.hall_id} onChange={e => setScheduleForm({...scheduleForm, hall_id: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                      <option value="">Select Hall...</option>
+                      {systemData.halls.map(h => <option key={h.id} value={h.id}>{h.name} (Cap: {h.capacity})</option>)}
+                    </select>
                   </div>
+
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Date</label>
                     <input type="date" required value={scheduleForm.date} onChange={e => setScheduleForm({...scheduleForm, date: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" />
@@ -257,6 +291,9 @@ const HODPortal = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Notification Slide-Out Panel */}
+      <NotificationPanel isOpen={isNotifPanelOpen} onClose={() => setIsNotifPanelOpen(false)} />
 
     </div>
   );
