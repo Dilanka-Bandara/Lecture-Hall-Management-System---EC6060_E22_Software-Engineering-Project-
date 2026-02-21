@@ -10,10 +10,9 @@ const loginUser = async (email, password) => {
     throw new Error('Invalid email or password');
   }
 
-  // 2. Check the password 
-  // Note: In production, use bcrypt.compare(). For our seed data testing, we check the raw string.
-  const isMatch = password === user.password_hash; 
-  
+  // 2. Check the password securely using bcrypt
+  const isMatch = await bcrypt.compare(password, user.password_hash);
+
   if (!isMatch) {
     throw new Error('Invalid email or password');
   }
