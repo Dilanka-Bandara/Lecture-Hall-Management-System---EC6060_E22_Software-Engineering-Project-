@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const adminRoutes = require('./modules/admin/admin.routes');
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/timetables', timetableRoutes);
 app.use('/api/swaps', swapRoutes);
 app.use('/api/issues', issueRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Basic Health Check
 app.get('/', (req, res) => {
