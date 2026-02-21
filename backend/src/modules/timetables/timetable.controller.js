@@ -43,4 +43,42 @@ const markAttendance = async (req, res) => {
   }
 };
 
-module.exports = { getMyTimetable, getStudentsForClass, markAttendance };
+// --- NEW HOD CONTROLLERS ---
+
+const getDepartmentSchedules = async (req, res) => {
+  try {
+    const schedules = await timetableService.getAllSchedules();
+    res.status(200).json(schedules);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const addSchedule = async (req, res) => {
+  try {
+    const newSchedule = await timetableService.createSchedule(req.body);
+    res.status(201).json(newSchedule);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create schedule. Check if IDs exist.' });
+  }
+};
+
+const removeSchedule = async (req, res) => {
+  try {
+    const result = await timetableService.deleteSchedule(req.params.id);
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Update exports
+module.exports = { 
+  getMyTimetable, 
+  getStudentsForClass, 
+  markAttendance,
+  getDepartmentSchedules,
+  addSchedule,
+  removeSchedule
+};
+
