@@ -72,6 +72,17 @@ const removeSchedule = async (req, res) => {
   }
 };
 
+const getMyAttendance = async (req, res) => {
+  try {
+    const metrics = await timetableService.getStudentAttendanceMetrics(req.user.id);
+    res.status(200).json(metrics);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Update your module.exports to include getMyAttendance!
+
 // Update exports
 module.exports = { 
   getMyTimetable, 
@@ -79,6 +90,8 @@ module.exports = {
   markAttendance,
   getDepartmentSchedules,
   addSchedule,
-  removeSchedule
+  removeSchedule,
+  getMyAttendance
+
 };
 

@@ -93,6 +93,46 @@ const submitAttendance = async (timetableId, attendanceData) => {
     return { success: true, message: 'Schedule deleted successfully' };
   };
 
+  // --- NEW STUDENT ATTENDANCE METRICS ---
+const getStudentAttendanceMetrics = async (studentId) => {
+  // Fetch all attendance records for the student, linked to subject names
+  const records = await db('attendance as a')
+    .join('timetables as t', 'a.timetable_id', 't.id')
+    .join('subjects as s', 't.subject_id', 's.id')
+    .where('a.student_id', studentId)
+    .select('s.subject_code', 's.subject_name', 'a.is_present');
+
+  // Group the records by subject and calculate the percentages
+  const metrics = {};
+  records.forEach(record => {
+    if (!metrics[record.subject_code]) {
+      metrics[record.subject_code] = {
+        subject_name: record.subject_name,
+        total_classes: 0,
+        attended_classes: 0
+      };
+    }
+    metrics[record.subject_code].total_classes += 1;
+    if (record.is_present) {
+      metrics[record.subject_code].attended_classes += 1;
+    }
+  });
+
+  // Convert to a clean array for the frontend
+  return Object.keys(metrics).map(code => {
+    const data = metrics[code];
+    const percentage = data.total_classes === 0 ? 0 : Math.round((data.attended_classes / data.total_classes) * 100);
+    return {
+      subject_code: code,
+      subject_name: data.subject_name,
+      total_classes: data.total_classes,
+      attended_classes: data.attended_classes,
+      percentage: percentage
+    };
+  });
+};
+
+
 
   // Insert records. If a record already exists, we ignore it (or you could use .onConflict().merge() to update it)
   await db('attendance').insert(recordsToInsert).onConflict(['timetable_id', 'student_id']).merge();
@@ -107,5 +147,6 @@ module.exports = {
   submitAttendance,
   getAllSchedules,
   createSchedule,
-  deleteSchedule
+  deleteSchedule,
+  getStudentAttendanceMetrics
 };

@@ -41,6 +41,13 @@ router.post('/department/new', verifyToken, authorizeRoles('hod', 'admin'), time
 // HOD deletes a schedule
 router.delete('/department/:id', verifyToken, authorizeRoles('hod', 'admin'), timetableController.removeSchedule);
 
+// GET /api/timetables/my-attendance
+router.get(
+  '/my-attendance', 
+  verifyToken, 
+  authorizeRoles('student'), 
+  timetableController.getMyAttendance
+);
 
 
 
