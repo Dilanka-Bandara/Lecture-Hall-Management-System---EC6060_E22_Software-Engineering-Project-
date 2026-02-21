@@ -3,6 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import StudentPortal from './pages/StudentPortal';
+import LecturerPortal from './pages/LecturerPortal';
+import HODPortal from './pages/HODPortal';
+
 // Import other portals as we build them...
 
 // Security Wrapper: Checks if user is logged in and has the right role
@@ -29,6 +32,19 @@ const App = () => {
             </ProtectedRoute>
           } />
           
+          <Route path="/lecturer-dashboard" element={
+            <ProtectedRoute allowedRole="lecturer">
+                <LecturerPortal />
+            </ProtectedRoute>
+            } />
+
+            <Route path="/hod-dashboard" element={
+            <ProtectedRoute allowedRole="hod">
+                <HODPortal />
+            </ProtectedRoute>
+            } />
+
+
           {/* Future Routes */}
           {/* <Route path="/hod-dashboard" element={<ProtectedRoute allowedRole="hod"><HODPortal /></ProtectedRoute>} /> */}
           
