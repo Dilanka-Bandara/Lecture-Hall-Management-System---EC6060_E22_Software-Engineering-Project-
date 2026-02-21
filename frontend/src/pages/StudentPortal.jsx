@@ -3,11 +3,15 @@ import { motion } from 'framer-motion';
 import { Calendar, Bell, LogOut, Clock, MapPin, BookOpen, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import NotificationPanel from '../components/NotificationPanel';
 
 const StudentPortal = () => {
   const { user, logout } = useAuth();
   const [timetable, setTimetable] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Add this right under your other state variables
+  const [isNotifPanelOpen, setIsNotifPanelOpen] = useState(false);
 
   useEffect(() => {
     // Fetch the actual timetable data from our secure backend
@@ -36,7 +40,7 @@ const StudentPortal = () => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
+    <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden relative">
       
       {/* Sleek Sidebar */}
       <motion.aside 
@@ -54,9 +58,11 @@ const StudentPortal = () => {
             <button className="w-full flex items-center px-4 py-3 text-indigo-700 bg-indigo-50 rounded-xl font-medium transition-colors">
               <Calendar className="w-5 h-5 mr-3" /> Timetable
             </button>
-            <button className="w-full flex items-center px-4 py-3 text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-xl font-medium transition-colors">
+            <button 
+              onClick={() => setIsNotifPanelOpen(true)} 
+              className="w-full flex items-center px-4 py-3 text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-xl font-medium transition-colors"
+            >
               <Bell className="w-5 h-5 mr-3" /> Notifications
-              <span className="ml-auto bg-rose-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">2</span>
             </button>
           </nav>
         </div>
@@ -146,6 +152,10 @@ const StudentPortal = () => {
           </motion.div>
         )}
       </main>
+
+      {/* NEW: Notification Panel Included Here */}
+      <NotificationPanel isOpen={isNotifPanelOpen} onClose={() => setIsNotifPanelOpen(false)} />
+
     </div>
   );
 };
