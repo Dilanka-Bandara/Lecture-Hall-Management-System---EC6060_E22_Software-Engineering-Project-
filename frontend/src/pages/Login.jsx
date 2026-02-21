@@ -34,7 +34,11 @@ const Login = () => {
         case 'technical_officer':
           navigate('/to-dashboard');
           break;
+        case 'admin':                  // <-- ADD THIS CASE
+          navigate('/admin-dashboard'); // <-- ADD THIS REDIRECT
+          break;
         default:
+          console.log("Unknown role received:", role); // Helpful for debugging!
           navigate('/');
       }
     } catch (err) {
