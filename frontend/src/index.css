@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* You can add a nice background color to the whole app here */
+body {
+  background-color: #f8fafc; /* slate-50 */
+  margin: 0;
+}
