@@ -10,9 +10,11 @@ app.use(express.json());
 
 // Import Routes
 const authRoutes = require('./modules/auth/auth.routes');
+const timetableRoutes = require('./modules/timetables/timetable.routes');
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/timetables', timetableRoutes);
 
 // Basic Health Check
 app.get('/', (req, res) => {
