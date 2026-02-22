@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Bell, LogOut, MapPin, AlertTriangle, RefreshCw, X, CheckCircle, BookOpen } from 'lucide-react';
+import { Calendar, Bell, LogOut, MapPin, AlertTriangle, RefreshCw, X, CheckCircle, BookOpen, UserCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import ThemeToggle from '../components/ThemeToggle';
-import NotificationPanel from '../components/NotificationPanel'; // <-- NEW
+import NotificationPanel from '../components/NotificationPanel';
 
 const LecturerPortal = () => {
   const { user, logout } = useAuth();
@@ -13,11 +13,20 @@ const LecturerPortal = () => {
   const [loading, setLoading] = useState(true);
   
   const [systemData, setSystemData] = useState({ lecturers: [], halls: [], subjects: [] });
+  
+  // Modal States
   const [isSwapModalOpen, setSwapModalOpen] = useState(false);
   const [isIssueModalOpen, setIssueModalOpen] = useState(false);
-  const [isNotifPanelOpen, setIsNotifPanelOpen] = useState(false); // <-- NEW STATE
+  const [isNotifPanelOpen, setIsNotifPanelOpen] = useState(false);
   const [notification, setNotification] = useState(null);
 
+  // --- NEW: ATTENDANCE STATES ---
+  const [isAttendanceModalOpen, setAttendanceModalOpen] = useState(false);
+  const [activeSession, setActiveSession] = useState(null);
+  const [studentsList, setStudentsList] = useState([]);
+  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
+
+  // Form States
   const [issueForm, setIssueForm] = useState({ hall_id: '', equipment_type: '', description: '' });
   const [swapForm, setSwapForm] = useState({ timetable_id: '', target_lecturer_id: '', proposed_date: '', proposed_start_time: '', proposed_end_time: '', proposed_hall_id: '' });
 
@@ -95,6 +104,47 @@ const LecturerPortal = () => {
     }
   };
 
+  // --- NEW: ATTENDANCE LOGIC ---
+  const openAttendanceModal = async (session) => {
+    setActiveSession(session);
+    setAttendanceModalOpen(true);
+    setStudentsList([]); // Clear previous list
+    try {
+      const res = await api.get(`/timetables/${session.timetable_id}/students`);
+      // Default everyone to 'present' (true) to make marking faster
+      const initializedStudents = res.data.map(student => ({ ...student, is_present: true }));
+      setStudentsList(initializedStudents);
+    } catch (error) {
+      alert("Failed to load student roster.");
+    }
+  };
+
+  const toggleStudentAttendance = (studentId) => {
+    setStudentsList(prev => prev.map(s => 
+      s.student_id === studentId ? { ...s, is_present: !s.is_present } : s
+    ));
+  };
+
+  const handleAttendanceSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmittingAttendance(true);
+    try {
+      const payload = {
+        attendanceRecords: studentsList.map(s => ({
+          student_id: s.student_id,
+          is_present: s.is_present
+        }))
+      };
+      await api.post(`/timetables/${activeSession.timetable_id}/attendance`, payload);
+      showNotification("Attendance recorded successfully.");
+      setAttendanceModalOpen(false);
+    } catch (error) {
+      alert("Failed to submit attendance.");
+    } finally {
+      setIsSubmittingAttendance(false);
+    }
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#0B1120] transition-colors duration-300">
       
@@ -128,12 +178,9 @@ const LecturerPortal = () => {
             <button onClick={() => setIssueModalOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-md text-sm font-medium transition-colors">
               <AlertTriangle className="w-4 h-4 mr-3 text-slate-400 dark:text-slate-500 group-hover:text-rose-500" /> Report Issue
             </button>
-            
-            {/* NEW NOTIFICATION BUTTON */}
             <button onClick={() => setIsNotifPanelOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white rounded-md text-sm font-medium transition-colors">
               <Bell className="w-4 h-4 mr-3 text-slate-400 dark:text-slate-500" /> Notifications
             </button>
-
           </nav>
         </div>
         
@@ -231,6 +278,17 @@ const LecturerPortal = () => {
                           </div>
                         </div>
                       </div>
+                      
+                      {/* NEW: MARK ATTENDANCE BUTTON */}
+                      <div className="mt-4 sm:mt-0 flex justify-end">
+                        <button 
+                          onClick={() => openAttendanceModal(session)}
+                          className="px-4 py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 font-semibold text-xs rounded-lg transition-colors flex items-center border border-emerald-200 dark:border-emerald-500/30"
+                        >
+                          <UserCheck className="w-4 h-4 mr-1.5" /> Mark Attendance
+                        </button>
+                      </div>
+
                     </div>
                   ))
                 )}
@@ -238,7 +296,6 @@ const LecturerPortal = () => {
             </div>
 
             <div className="space-y-6">
-              
               <div className="bg-indigo-600 dark:bg-indigo-500/10 border border-transparent dark:border-indigo-500/20 p-6 rounded-2xl text-white dark:text-indigo-100 shadow-sm">
                 <h3 className="text-lg font-bold mb-1">Need a change?</h3>
                 <p className="text-indigo-100 dark:text-indigo-200/70 text-sm mb-5">Initiate a swap request with another lecturer. The HOD will be notified automatically upon their approval.</p>
@@ -262,7 +319,10 @@ const LecturerPortal = () => {
         )}
       </main>
 
+      {/* MODALS */}
       <AnimatePresence>
+        
+        {/* ... (Previous Issue Modal) ... */}
         {isIssueModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-md overflow-hidden border-none shadow-2xl">
@@ -293,6 +353,7 @@ const LecturerPortal = () => {
           </div>
         )}
 
+        {/* ... (Previous Swap Modal) ... */}
         {isSwapModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-lg overflow-hidden border-none shadow-2xl">
@@ -309,7 +370,6 @@ const LecturerPortal = () => {
                       {timetable.map(t => <option key={t.timetable_id} value={t.timetable_id}>{t.subject_code} - {t.date.split('T')[0]}</option>)}
                     </select>
                   </div>
-
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Target Lecturer</label>
                     <select required value={swapForm.target_lecturer_id} onChange={e => setSwapForm({...swapForm, target_lecturer_id: e.target.value})} className="saas-input">
@@ -319,7 +379,6 @@ const LecturerPortal = () => {
                       ))}
                     </select>
                   </div>
-
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Proposed Hall</label>
                     <select required value={swapForm.proposed_hall_id} onChange={e => setSwapForm({...swapForm, proposed_hall_id: e.target.value})} className="saas-input">
@@ -329,12 +388,10 @@ const LecturerPortal = () => {
                       ))}
                     </select>
                   </div>
-
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Proposed Date</label>
                     <input type="date" required value={swapForm.proposed_date} onChange={e => setSwapForm({...swapForm, proposed_date: e.target.value})} className="saas-input" />
                   </div>
-                  
                   <div className="col-span-2 sm:col-span-1 grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Start</label>
@@ -346,7 +403,6 @@ const LecturerPortal = () => {
                     </div>
                   </div>
                 </div>
-                
                 <div className="pt-2">
                   <button type="submit" className="saas-button w-full">Send Request to Lecturer</button>
                 </div>
@@ -354,9 +410,69 @@ const LecturerPortal = () => {
             </motion.div>
           </div>
         )}
+
+        {/* NEW: ATTENDANCE MODAL */}
+        {isAttendanceModalOpen && activeSession && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-lg overflow-hidden border-none shadow-2xl flex flex-col max-h-[85vh]">
+              
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center">
+                    <UserCheck className="w-5 h-5 mr-2 text-indigo-500" /> Class Roster
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{activeSession.subject_code} • {activeSession.subject_name}</p>
+                </div>
+                <button onClick={() => setAttendanceModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><X className="w-5 h-5" /></button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-1 bg-slate-50/30 dark:bg-[#0B1120]/50">
+                {studentsList.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">Loading students...</div>
+                ) : (
+                  <div className="space-y-3">
+                    {studentsList.map(student => (
+                      <div key={student.student_id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-colors">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">{student.name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{student.university_id}</p>
+                        </div>
+                        
+                        {/* iOS Style Custom Toggle Switch */}
+                        <div 
+                          onClick={() => toggleStudentAttendance(student.student_id)}
+                          className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ${student.is_present ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                        >
+                          <motion.div 
+                            layout 
+                            className="bg-white w-4 h-4 rounded-full shadow-sm"
+                            animate={{ x: student.is_present ? 24 : 0 }}
+                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <button 
+                  onClick={handleAttendanceSubmit} 
+                  disabled={isSubmittingAttendance || studentsList.length === 0}
+                  className="saas-button w-full py-3"
+                >
+                  {isSubmittingAttendance ? 'Saving Records...' : 'Submit Attendance'}
+                </button>
+              </div>
+
+            </motion.div>
+          </div>
+        )}
+
       </AnimatePresence>
 
-      {/* NEW: THE SLIDE-OUT NOTIFICATION COMPONENT */}
+      {/* Notification Slide-Out Panel */}
       <NotificationPanel isOpen={isNotifPanelOpen} onClose={() => setIsNotifPanelOpen(false)} />
 
     </div>

@@ -17,7 +17,7 @@ router.get(
 router.get(
   '/:timetableId/students',
   verifyToken,
-  authorizeRoles('hod'),
+  authorizeRoles('hod', 'lecturer'),
   timetableController.getStudentsForClass
 );
 
@@ -26,7 +26,7 @@ router.get(
 router.post(
   '/:timetableId/attendance',
   verifyToken,
-  authorizeRoles('hod'),
+  authorizeRoles('hod', 'lecturer'),
   timetableController.markAttendance
 );
 
