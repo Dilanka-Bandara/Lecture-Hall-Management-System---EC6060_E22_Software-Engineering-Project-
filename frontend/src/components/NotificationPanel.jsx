@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, X, Check } from 'lucide-react';
 import api from '../services/api';
 
-const NotificationPanel = ({ isOpen, onClose }) => {
+const NotificationPanel = ({ isOpen, onClose, onNotificationsUpdate }) => {
   const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
@@ -16,6 +16,10 @@ const NotificationPanel = ({ isOpen, onClose }) => {
     try {
       const response = await api.get('/notifications');
       setNotifications(response.data);
+      // Synchronize the unread count with the parent component (the red dot)
+      if (onNotificationsUpdate) {
+        onNotificationsUpdate(response.data.filter(n => !n.is_read).length);
+      }
     } catch (error) {
       console.error("Failed to fetch notifications", error);
     }
@@ -24,7 +28,12 @@ const NotificationPanel = ({ isOpen, onClose }) => {
   const markAsRead = async (id) => {
     try {
       await api.patch(`/notifications/${id}/read`);
-      setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: 1 } : n));
+      const updatedList = notifications.map(n => n.id === id ? { ...n, is_read: 1 } : n);
+      setNotifications(updatedList);
+      // Synchronize the unread count
+      if (onNotificationsUpdate) {
+        onNotificationsUpdate(updatedList.filter(n => !n.is_read).length);
+      }
     } catch (error) {
       console.error("Failed to mark as read", error);
     }
@@ -33,7 +42,12 @@ const NotificationPanel = ({ isOpen, onClose }) => {
   const markAllAsRead = async () => {
     try {
       await api.patch('/notifications/read-all');
-      setNotifications(notifications.map(n => ({ ...n, is_read: 1 })));
+      const updatedList = notifications.map(n => ({ ...n, is_read: 1 }));
+      setNotifications(updatedList);
+      // Synchronize the unread count (it will be 0)
+      if (onNotificationsUpdate) {
+        onNotificationsUpdate(0);
+      }
     } catch (error) {
       console.error("Failed to mark all as read", error);
     }
