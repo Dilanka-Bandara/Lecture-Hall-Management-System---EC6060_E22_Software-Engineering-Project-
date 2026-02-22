@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Bell, LogOut, MapPin, AlertTriangle, RefreshCw, X, CheckCircle, BookOpen, UserCheck } from 'lucide-react';
+import { Calendar, Bell, LogOut, MapPin, AlertTriangle, RefreshCw, X, CheckCircle, BookOpen, UserCheck, Filter } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import ThemeToggle from '../components/ThemeToggle';
@@ -20,7 +20,7 @@ const LecturerPortal = () => {
   const [isNotifPanelOpen, setIsNotifPanelOpen] = useState(false);
   const [notification, setNotification] = useState(null);
 
-  // --- NEW: ATTENDANCE STATES ---
+  // Attendance States
   const [isAttendanceModalOpen, setAttendanceModalOpen] = useState(false);
   const [activeSession, setActiveSession] = useState(null);
   const [studentsList, setStudentsList] = useState([]);
@@ -29,6 +29,10 @@ const LecturerPortal = () => {
   // Form States
   const [issueForm, setIssueForm] = useState({ hall_id: '', equipment_type: '', description: '' });
   const [swapForm, setSwapForm] = useState({ timetable_id: '', target_lecturer_id: '', proposed_date: '', proposed_start_time: '', proposed_end_time: '', proposed_hall_id: '' });
+
+  // --- NEW: SCHEDULE FILTER STATES ---
+  const [scheduleTab, setScheduleTab] = useState('upcoming'); // 'upcoming', 'past', 'filter'
+  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     fetchTimetable();
@@ -104,14 +108,12 @@ const LecturerPortal = () => {
     }
   };
 
-  // --- NEW: ATTENDANCE LOGIC ---
   const openAttendanceModal = async (session) => {
     setActiveSession(session);
     setAttendanceModalOpen(true);
-    setStudentsList([]); // Clear previous list
+    setStudentsList([]); 
     try {
       const res = await api.get(`/timetables/${session.timetable_id}/students`);
-      // Default everyone to 'present' (true) to make marking faster
       const initializedStudents = res.data.map(student => ({ ...student, is_present: true }));
       setStudentsList(initializedStudents);
     } catch (error) {
@@ -144,6 +146,24 @@ const LecturerPortal = () => {
       setIsSubmittingAttendance(false);
     }
   };
+
+  // --- NEW: LOGIC TO FILTER SCHEDULE ---
+  const getDisplayedSchedule = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    if (scheduleTab === 'upcoming') {
+      return timetable.filter(t => t.date.split('T')[0] >= todayStr);
+    }
+    if (scheduleTab === 'past') {
+      return timetable.filter(t => t.date.split('T')[0] < todayStr);
+    }
+    if (scheduleTab === 'filter') {
+      return timetable.filter(t => t.date.split('T')[0] === filterDate);
+    }
+    return timetable;
+  };
+
+  const displayedSchedule = getDisplayedSchedule();
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#0B1120] transition-colors duration-300">
@@ -250,16 +270,60 @@ const LecturerPortal = () => {
                 </div>
               )}
 
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Upcoming Lectures</h3>
+              {/* NEW: SCHEDULE SEGMENTED TABS */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center">
+                  <Calendar className="w-4 h-4 mr-2 text-indigo-500" /> Teaching Schedule
+                </h3>
+                
+                <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <button 
+                    onClick={() => setScheduleTab('upcoming')} 
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'upcoming' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                  >
+                    Upcoming
+                  </button>
+                  <button 
+                    onClick={() => setScheduleTab('past')} 
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'past' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                  >
+                    Previous
+                  </button>
+                  <button 
+                    onClick={() => setScheduleTab('filter')} 
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'filter' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                  >
+                    By Date
+                  </button>
+                </div>
+              </div>
+
+              {/* NEW: DATE FILTER INPUT (Only shows if 'By Date' tab is clicked) */}
+              <AnimatePresence>
+                {scheduleTab === 'filter' && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-4 overflow-hidden">
+                    <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl shadow-sm">
+                      <Filter className="w-4 h-4 text-indigo-500 mr-2" />
+                      <span className="text-sm font-medium text-slate-600 dark:text-slate-400 mr-3">Select Date:</span>
+                      <input 
+                        type="date" 
+                        value={filterDate} 
+                        onChange={(e) => setFilterDate(e.target.value)} 
+                        className="saas-input py-1.5 max-w-[200px]" 
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               
               <div className="space-y-3">
-                {timetable.length === 0 ? (
+                {displayedSchedule.length === 0 ? (
                   <div className="saas-card p-8 text-center text-sm text-slate-500 dark:text-slate-400">
-                    No lectures scheduled today.
+                    {scheduleTab === 'filter' ? 'No lectures scheduled for this date.' : `No ${scheduleTab} lectures found.`}
                   </div>
                 ) : (
-                  timetable.map((session) => (
-                    <div key={session.timetable_id} className="saas-card p-5 flex flex-col sm:flex-row sm:items-center justify-between">
+                  displayedSchedule.map((session) => (
+                    <div key={session.timetable_id} className="saas-card p-5 flex flex-col sm:flex-row sm:items-center justify-between hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-colors">
                       <div className="flex items-start sm:items-center space-x-4">
                         <div className="w-20 text-center flex-shrink-0">
                           <span className="block text-sm font-bold text-slate-900 dark:text-white">{session.start_time.slice(0, 5)}</span>
@@ -271,6 +335,8 @@ const LecturerPortal = () => {
                         <div>
                           <div className="flex items-center space-x-2 mb-1">
                             <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded uppercase tracking-wider">{session.subject_code}</span>
+                            {/* Visual cue for the date of the session */}
+                            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 ml-2">{session.date.split('T')[0]}</span>
                           </div>
                           <h3 className="text-base font-semibold text-slate-900 dark:text-white">{session.subject_name}</h3>
                           <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -279,7 +345,6 @@ const LecturerPortal = () => {
                         </div>
                       </div>
                       
-                      {/* NEW: MARK ATTENDANCE BUTTON */}
                       <div className="mt-4 sm:mt-0 flex justify-end">
                         <button 
                           onClick={() => openAttendanceModal(session)}
@@ -322,7 +387,6 @@ const LecturerPortal = () => {
       {/* MODALS */}
       <AnimatePresence>
         
-        {/* ... (Previous Issue Modal) ... */}
         {isIssueModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-md overflow-hidden border-none shadow-2xl">
@@ -353,7 +417,6 @@ const LecturerPortal = () => {
           </div>
         )}
 
-        {/* ... (Previous Swap Modal) ... */}
         {isSwapModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-lg overflow-hidden border-none shadow-2xl">
@@ -411,7 +474,6 @@ const LecturerPortal = () => {
           </div>
         )}
 
-        {/* NEW: ATTENDANCE MODAL */}
         {isAttendanceModalOpen && activeSession && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-lg overflow-hidden border-none shadow-2xl flex flex-col max-h-[85vh]">
@@ -438,7 +500,6 @@ const LecturerPortal = () => {
                           <p className="text-xs text-slate-500 dark:text-slate-400">{student.university_id}</p>
                         </div>
                         
-                        {/* iOS Style Custom Toggle Switch */}
                         <div 
                           onClick={() => toggleStudentAttendance(student.student_id)}
                           className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ${student.is_present ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
@@ -472,7 +533,6 @@ const LecturerPortal = () => {
 
       </AnimatePresence>
 
-      {/* Notification Slide-Out Panel */}
       <NotificationPanel isOpen={isNotifPanelOpen} onClose={() => setIsNotifPanelOpen(false)} />
 
     </div>
