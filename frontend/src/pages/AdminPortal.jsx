@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Users, MapPin, Plus, LogOut, ShieldAlert, BookOpen } from 'lucide-react';
+import { Users, MapPin, Plus, LogOut, ShieldAlert, BookOpen, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import ThemeToggle from '../components/ThemeToggle';
+import NotificationPanel from '../components/NotificationPanel';
 
 const AdminPortal = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [halls, setHalls] = useState([]);
+  const [isNotifPanelOpen, setIsNotifPanelOpen] = useState(false); // <-- NEW STATE
   
   const [userForm, setUserForm] = useState({ name: '', email: '', university_id: '', role: 'student', batch: '' });
   const [hallForm, setHallForm] = useState({ name: '', capacity: '', has_projector: true });
@@ -73,6 +75,11 @@ const AdminPortal = () => {
             </button>
             <button onClick={() => setActiveTab('halls')} className={`w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'halls' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
               <MapPin className="w-4 h-4 mr-3" /> Manage Halls
+            </button>
+            
+            {/* NEW: NOTIFICATIONS TAB */}
+            <button onClick={() => setIsNotifPanelOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white rounded-md text-sm font-medium transition-colors">
+              <Bell className="w-4 h-4 mr-3 text-slate-400 dark:text-slate-500" /> Notifications
             </button>
           </nav>
         </div>
@@ -223,6 +230,10 @@ const AdminPortal = () => {
 
         </div>
       </main>
+
+      {/* NEW: THE SLIDE-OUT NOTIFICATION COMPONENT */}
+      <NotificationPanel isOpen={isNotifPanelOpen} onClose={() => setIsNotifPanelOpen(false)} />
+
     </div>
   );
 };
