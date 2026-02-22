@@ -4,6 +4,7 @@ import { Wrench, Bell, LogOut, CheckCircle, Clock, AlertCircle, Monitor, ShieldA
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import ThemeToggle from '../components/ThemeToggle';
+import NotificationPanel from '../components/NotificationPanel'; // <-- NEW
 
 const TOPortal = () => {
   const { user, logout } = useAuth();
@@ -11,6 +12,7 @@ const TOPortal = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [notification, setNotification] = useState(null);
+  const [isNotifPanelOpen, setIsNotifPanelOpen] = useState(false); // <-- NEW STATE
 
   useEffect(() => {
     fetchIssues();
@@ -84,10 +86,13 @@ const TOPortal = () => {
             <button className="w-full flex items-center px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-md text-sm font-medium transition-colors">
               <Monitor className="w-4 h-4 mr-3 text-indigo-500 dark:text-indigo-400" /> Support Desk
             </button>
-            <button className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white rounded-md text-sm font-medium transition-colors">
+            
+            {/* NEW: CLICKABLE NOTIFICATION/ALERT BUTTON */}
+            <button onClick={() => setIsNotifPanelOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white rounded-md text-sm font-medium transition-colors">
               <Bell className="w-4 h-4 mr-3 text-slate-400 dark:text-slate-500" /> System Alerts
               {pendingCount > 0 && <span className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{pendingCount}</span>}
             </button>
+
           </nav>
         </div>
         <div className="p-4 border-t border-slate-100 dark:border-slate-800">
@@ -218,6 +223,10 @@ const TOPortal = () => {
           </div>
         </div>
       </main>
+
+      {/* NEW: THE SLIDE-OUT NOTIFICATION COMPONENT */}
+      <NotificationPanel isOpen={isNotifPanelOpen} onClose={() => setIsNotifPanelOpen(false)} />
+
     </div>
   );
 };
