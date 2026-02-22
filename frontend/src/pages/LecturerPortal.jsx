@@ -6,6 +6,28 @@ import api from '../services/api';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationPanel from '../components/NotificationPanel';
 
+// UX UPGRADE: Helper function to generate the next 60 valid dates cleanly
+const generateFutureDates = () => {
+  const dates = [];
+  const today = new Date();
+  
+  for (let i = 0; i <= 60; i++) {
+    const d = new Date();
+    d.setDate(today.getDate() + i);
+    
+    dates.push({
+      value: d.toISOString().split('T')[0], // The format the database needs (YYYY-MM-DD)
+      label: d.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      }) // The beautiful format the user sees (Mon, Feb 23, 2026)
+    });
+  }
+  return dates;
+};
+
 const LecturerPortal = () => {
   const { user, logout } = useAuth();
   const [timetable, setTimetable] = useState([]);
@@ -30,9 +52,12 @@ const LecturerPortal = () => {
   const [issueForm, setIssueForm] = useState({ hall_id: '', equipment_type: '', description: '' });
   const [swapForm, setSwapForm] = useState({ timetable_id: '', target_lecturer_id: '', proposed_date: '', proposed_start_time: '', proposed_end_time: '', proposed_hall_id: '' });
 
-  // --- NEW: SCHEDULE FILTER STATES ---
-  const [scheduleTab, setScheduleTab] = useState('upcoming'); // 'upcoming', 'past', 'filter'
+  // Schedule Filter States
+  const [scheduleTab, setScheduleTab] = useState('upcoming'); 
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Generate our custom date options once when the component loads
+  const futureDateOptions = generateFutureDates();
 
   useEffect(() => {
     fetchTimetable();
@@ -88,6 +113,10 @@ const LecturerPortal = () => {
 
   const handleSwapSubmit = async (e) => {
     e.preventDefault();
+    if (!swapForm.proposed_start_time || !swapForm.proposed_end_time) {
+      alert("Please select a valid time slot.");
+      return;
+    }
     try {
       await api.post('/swaps', swapForm); 
       setSwapModalOpen(false);
@@ -147,10 +176,8 @@ const LecturerPortal = () => {
     }
   };
 
-  // --- NEW: LOGIC TO FILTER SCHEDULE ---
   const getDisplayedSchedule = () => {
     const todayStr = new Date().toISOString().split('T')[0];
-    
     if (scheduleTab === 'upcoming') {
       return timetable.filter(t => t.date.split('T')[0] >= todayStr);
     }
@@ -179,7 +206,6 @@ const LecturerPortal = () => {
         )}
       </AnimatePresence>
 
-      {/* SaaS Sidebar */}
       <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between z-10 hidden md:flex transition-colors duration-300">
         <div>
           <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-800">
@@ -220,7 +246,6 @@ const LecturerPortal = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-8 z-10">
         <header className="mb-8 flex flex-col md:flex-row md:justify-between md:items-end border-b border-slate-200 dark:border-slate-800 pb-6">
           <div>
@@ -270,47 +295,25 @@ const LecturerPortal = () => {
                 </div>
               )}
 
-              {/* NEW: SCHEDULE SEGMENTED TABS */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center">
                   <Calendar className="w-4 h-4 mr-2 text-indigo-500" /> Teaching Schedule
                 </h3>
                 
                 <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <button 
-                    onClick={() => setScheduleTab('upcoming')} 
-                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'upcoming' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-                  >
-                    Upcoming
-                  </button>
-                  <button 
-                    onClick={() => setScheduleTab('past')} 
-                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'past' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-                  >
-                    Previous
-                  </button>
-                  <button 
-                    onClick={() => setScheduleTab('filter')} 
-                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'filter' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-                  >
-                    By Date
-                  </button>
+                  <button onClick={() => setScheduleTab('upcoming')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'upcoming' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>Upcoming</button>
+                  <button onClick={() => setScheduleTab('past')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'past' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>Previous</button>
+                  <button onClick={() => setScheduleTab('filter')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'filter' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>By Date</button>
                 </div>
               </div>
 
-              {/* NEW: DATE FILTER INPUT (Only shows if 'By Date' tab is clicked) */}
               <AnimatePresence>
                 {scheduleTab === 'filter' && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-4 overflow-hidden">
                     <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl shadow-sm">
                       <Filter className="w-4 h-4 text-indigo-500 mr-2" />
                       <span className="text-sm font-medium text-slate-600 dark:text-slate-400 mr-3">Select Date:</span>
-                      <input 
-                        type="date" 
-                        value={filterDate} 
-                        onChange={(e) => setFilterDate(e.target.value)} 
-                        className="saas-input py-1.5 max-w-[200px]" 
-                      />
+                      <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="saas-input py-1.5 max-w-[200px]" />
                     </div>
                   </motion.div>
                 )}
@@ -335,7 +338,6 @@ const LecturerPortal = () => {
                         <div>
                           <div className="flex items-center space-x-2 mb-1">
                             <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded uppercase tracking-wider">{session.subject_code}</span>
-                            {/* Visual cue for the date of the session */}
                             <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 ml-2">{session.date.split('T')[0]}</span>
                           </div>
                           <h3 className="text-base font-semibold text-slate-900 dark:text-white">{session.subject_name}</h3>
@@ -451,20 +453,46 @@ const LecturerPortal = () => {
                       ))}
                     </select>
                   </div>
+                  
+                  {/* UX UPGRADE: The Custom Smart Date Dropdown */}
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Proposed Date</label>
-                    <input type="date" required value={swapForm.proposed_date} onChange={e => setSwapForm({...swapForm, proposed_date: e.target.value})} className="saas-input" />
+                    <select 
+                      required 
+                      value={swapForm.proposed_date} 
+                      onChange={e => setSwapForm({...swapForm, proposed_date: e.target.value})} 
+                      className="saas-input"
+                    >
+                      <option value="">Select Date...</option>
+                      {futureDateOptions.map(dateObj => (
+                        <option key={dateObj.value} value={dateObj.value}>
+                          {dateObj.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <div className="col-span-2 sm:col-span-1 grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Start</label>
-                      <input type="time" required value={swapForm.proposed_start_time} onChange={e => setSwapForm({...swapForm, proposed_start_time: e.target.value})} className="saas-input px-2" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">End</label>
-                      <input type="time" required value={swapForm.proposed_end_time} onChange={e => setSwapForm({...swapForm, proposed_end_time: e.target.value})} className="saas-input px-2" />
-                    </div>
+                  
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Time Slot</label>
+                    <select 
+                      required 
+                      value={swapForm.proposed_start_time ? `${swapForm.proposed_start_time}-${swapForm.proposed_end_time}` : ""}
+                      onChange={e => {
+                        if(!e.target.value) return;
+                        const [start, end] = e.target.value.split('-');
+                        setSwapForm({...swapForm, proposed_start_time: start, proposed_end_time: end});
+                      }}
+                      className="saas-input"
+                    >
+                      <option value="">Select a time slot...</option>
+                      <option value="08:00-10:00">08:00 AM - 10:00 AM</option>
+                      <option value="10:00-12:00">10:00 AM - 12:00 PM</option>
+                      <option value="13:00-15:00">01:00 PM - 03:00 PM</option>
+                      <option value="15:00-17:00">03:00 PM - 05:00 PM</option>
+                      <option value="17:00-19:00">05:00 PM - 07:00 PM</option>
+                    </select>
                   </div>
+
                 </div>
                 <div className="pt-2">
                   <button type="submit" className="saas-button w-full">Send Request to Lecturer</button>
