@@ -4,16 +4,18 @@ import { Calendar, Bell, LogOut, MapPin, AlertTriangle, RefreshCw, X, CheckCircl
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import ThemeToggle from '../components/ThemeToggle';
+import NotificationPanel from '../components/NotificationPanel'; // <-- NEW
 
 const LecturerPortal = () => {
   const { user, logout } = useAuth();
   const [timetable, setTimetable] = useState([]);
-  const [pendingSwaps, setPendingSwaps] = useState([]); // <-- NEW: State for incoming swaps
+  const [pendingSwaps, setPendingSwaps] = useState([]); 
   const [loading, setLoading] = useState(true);
   
   const [systemData, setSystemData] = useState({ lecturers: [], halls: [], subjects: [] });
   const [isSwapModalOpen, setSwapModalOpen] = useState(false);
   const [isIssueModalOpen, setIssueModalOpen] = useState(false);
+  const [isNotifPanelOpen, setIsNotifPanelOpen] = useState(false); // <-- NEW STATE
   const [notification, setNotification] = useState(null);
 
   const [issueForm, setIssueForm] = useState({ hall_id: '', equipment_type: '', description: '' });
@@ -22,7 +24,7 @@ const LecturerPortal = () => {
   useEffect(() => {
     fetchTimetable();
     fetchSystemData();
-    fetchPendingSwaps(); // <-- NEW: Fetch incoming swaps on load
+    fetchPendingSwaps(); 
   }, []);
 
   const fetchTimetable = async () => {
@@ -45,7 +47,6 @@ const LecturerPortal = () => {
     }
   };
 
-  // NEW: Function to get incoming swap requests
   const fetchPendingSwaps = async () => {
     try {
       const response = await api.get('/swaps/pending');
@@ -84,12 +85,11 @@ const LecturerPortal = () => {
     }
   };
 
-  // NEW: Function to respond to incoming swaps
   const handleSwapRespond = async (swapId, status) => {
     try {
       await api.patch(`/swaps/${swapId}/respond`, { status });
       showNotification(`Swap request ${status}.`);
-      fetchPendingSwaps(); // Refresh list after responding
+      fetchPendingSwaps(); 
     } catch (error) {
       alert("Failed to respond to swap request");
     }
@@ -98,7 +98,6 @@ const LecturerPortal = () => {
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#0B1120] transition-colors duration-300">
       
-      {/* Toast Notification */}
       <AnimatePresence>
         {notification && (
           <motion.div 
@@ -129,6 +128,12 @@ const LecturerPortal = () => {
             <button onClick={() => setIssueModalOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-md text-sm font-medium transition-colors">
               <AlertTriangle className="w-4 h-4 mr-3 text-slate-400 dark:text-slate-500 group-hover:text-rose-500" /> Report Issue
             </button>
+            
+            {/* NEW NOTIFICATION BUTTON */}
+            <button onClick={() => setIsNotifPanelOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white rounded-md text-sm font-medium transition-colors">
+              <Bell className="w-4 h-4 mr-3 text-slate-400 dark:text-slate-500" /> Notifications
+            </button>
+
           </nav>
         </div>
         
@@ -167,11 +172,8 @@ const LecturerPortal = () => {
           <div className="flex h-32 items-center justify-center text-slate-500 dark:text-slate-400 text-sm">Loading schedule...</div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            
-            {/* Schedule & Swaps Column */}
             <div className="xl:col-span-2">
               
-              {/* NEW: Incoming Swap Requests Section */}
               {pendingSwaps.length > 0 && (
                 <div className="mb-8">
                   <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center text-amber-600 dark:text-amber-500">
@@ -235,7 +237,6 @@ const LecturerPortal = () => {
               </div>
             </div>
 
-            {/* Quick Actions Column */}
             <div className="space-y-6">
               
               <div className="bg-indigo-600 dark:bg-indigo-500/10 border border-transparent dark:border-indigo-500/20 p-6 rounded-2xl text-white dark:text-indigo-100 shadow-sm">
@@ -261,9 +262,7 @@ const LecturerPortal = () => {
         )}
       </main>
 
-      {/* MODALS */}
       <AnimatePresence>
-        {/* ... (Issue Modal remains identical) ... */}
         {isIssueModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-md overflow-hidden border-none shadow-2xl">
@@ -294,7 +293,6 @@ const LecturerPortal = () => {
           </div>
         )}
 
-        {/* ... (Swap Modal remains identical) ... */}
         {isSwapModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-lg overflow-hidden border-none shadow-2xl">
@@ -357,6 +355,10 @@ const LecturerPortal = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* NEW: THE SLIDE-OUT NOTIFICATION COMPONENT */}
+      <NotificationPanel isOpen={isNotifPanelOpen} onClose={() => setIsNotifPanelOpen(false)} />
+
     </div>
   );
 };
