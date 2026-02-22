@@ -58,12 +58,24 @@ const LecturerPortal = () => {
 
   // Generate our custom date options once when the component loads
   const futureDateOptions = generateFutureDates();
+  
+  // Notification Count State
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   useEffect(() => {
     fetchTimetable();
     fetchSystemData();
     fetchPendingSwaps(); 
+    fetchUnreadNotifs();
   }, []);
+
+  // Fetch unread count on initial load
+  const fetchUnreadNotifs = async () => {
+    try {
+      const res = await api.get('/notifications');
+      setUnreadNotifCount(res.data.filter(n => !n.is_read).length);
+    } catch(e) { console.error(e) }
+  };
 
   const fetchTimetable = async () => {
     try {
@@ -224,9 +236,18 @@ const LecturerPortal = () => {
             <button onClick={() => setIssueModalOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-md text-sm font-medium transition-colors">
               <AlertTriangle className="w-4 h-4 mr-3 text-slate-400 dark:text-slate-500 group-hover:text-rose-500" /> Report Issue
             </button>
+            
+            {/* UPDATED NOTIFICATION BUTTON WITH RED DOT */}
             <button onClick={() => setIsNotifPanelOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white rounded-md text-sm font-medium transition-colors">
-              <Bell className="w-4 h-4 mr-3 text-slate-400 dark:text-slate-500" /> Notifications
+              <div className="relative mr-3">
+                <Bell className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                {unreadNotifCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-rose-500 rounded-full animate-pulse border border-white dark:border-slate-900"></span>
+                )}
+              </div>
+              Notifications
             </button>
+            
           </nav>
         </div>
         
@@ -561,7 +582,12 @@ const LecturerPortal = () => {
 
       </AnimatePresence>
 
-      <NotificationPanel isOpen={isNotifPanelOpen} onClose={() => setIsNotifPanelOpen(false)} />
+      {/* UPDATED NOTIFICATION PANEL WITH SYNC PROP */}
+      <NotificationPanel 
+        isOpen={isNotifPanelOpen} 
+        onClose={() => setIsNotifPanelOpen(false)} 
+        onNotificationsUpdate={(count) => setUnreadNotifCount(count)} 
+      />
 
     </div>
   );
