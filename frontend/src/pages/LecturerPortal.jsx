@@ -8,6 +8,7 @@ import ThemeToggle from '../components/ThemeToggle';
 const LecturerPortal = () => {
   const { user, logout } = useAuth();
   const [timetable, setTimetable] = useState([]);
+  const [pendingSwaps, setPendingSwaps] = useState([]); // <-- NEW: State for incoming swaps
   const [loading, setLoading] = useState(true);
   
   const [systemData, setSystemData] = useState({ lecturers: [], halls: [], subjects: [] });
@@ -21,6 +22,7 @@ const LecturerPortal = () => {
   useEffect(() => {
     fetchTimetable();
     fetchSystemData();
+    fetchPendingSwaps(); // <-- NEW: Fetch incoming swaps on load
   }, []);
 
   const fetchTimetable = async () => {
@@ -40,6 +42,16 @@ const LecturerPortal = () => {
       setSystemData(response.data);
     } catch (error) {
       console.error("Failed to load system data", error);
+    }
+  };
+
+  // NEW: Function to get incoming swap requests
+  const fetchPendingSwaps = async () => {
+    try {
+      const response = await api.get('/swaps/pending');
+      setPendingSwaps(response.data);
+    } catch (error) {
+      console.error("Failed to fetch pending swaps", error);
     }
   };
 
@@ -65,10 +77,21 @@ const LecturerPortal = () => {
     try {
       await api.post('/swaps', swapForm); 
       setSwapModalOpen(false);
-      showNotification("Swap request sent to Lecturer and HOD for approval.");
+      showNotification("Swap request sent to Lecturer for approval.");
       setSwapForm({ timetable_id: '', target_lecturer_id: '', proposed_date: '', proposed_start_time: '', proposed_end_time: '', proposed_hall_id: '' });
     } catch (error) {
       alert("Failed to submit swap request");
+    }
+  };
+
+  // NEW: Function to respond to incoming swaps
+  const handleSwapRespond = async (swapId, status) => {
+    try {
+      await api.patch(`/swaps/${swapId}/respond`, { status });
+      showNotification(`Swap request ${status}.`);
+      fetchPendingSwaps(); // Refresh list after responding
+    } catch (error) {
+      alert("Failed to respond to swap request");
     }
   };
 
@@ -144,8 +167,40 @@ const LecturerPortal = () => {
           <div className="flex h-32 items-center justify-center text-slate-500 dark:text-slate-400 text-sm">Loading schedule...</div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Schedule Column */}
+            
+            {/* Schedule & Swaps Column */}
             <div className="xl:col-span-2">
+              
+              {/* NEW: Incoming Swap Requests Section */}
+              {pendingSwaps.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center text-amber-600 dark:text-amber-500">
+                    <AlertTriangle className="w-4 h-4 mr-2" /> Action Required: Swap Requests
+                  </h3>
+                  <div className="space-y-3">
+                    {pendingSwaps.map(swap => (
+                      <div key={swap.swap_id} className="saas-card p-5 border-amber-200 dark:border-amber-500/30 bg-amber-50/50 dark:bg-amber-500/5 flex flex-col sm:flex-row sm:items-center justify-between">
+                        <div>
+                          <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wider rounded">Swap Request</span>
+                          <h4 className="font-semibold text-sm text-slate-900 dark:text-white mt-1.5">{swap.subject_name}</h4>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                            <span className="font-medium text-slate-900 dark:text-slate-300">{swap.requesting_lecturer}</span> proposed: <span className="font-medium text-slate-900 dark:text-slate-300">{swap.proposed_date.split('T')[0]}</span> at <span className="font-medium text-slate-900 dark:text-slate-300">{swap.proposed_start_time.slice(0,5)}</span>
+                          </p>
+                        </div>
+                        <div className="flex space-x-2 mt-4 sm:mt-0">
+                          <button onClick={() => handleSwapRespond(swap.swap_id, 'accepted')} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium text-xs transition-colors flex items-center">
+                            <CheckCircle className="w-3.5 h-3.5 mr-1" /> Accept
+                          </button>
+                          <button onClick={() => handleSwapRespond(swap.swap_id, 'rejected')} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium text-xs transition-colors flex items-center">
+                            <X className="w-3.5 h-3.5 mr-1" /> Decline
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Upcoming Lectures</h3>
               
               <div className="space-y-3">
@@ -185,7 +240,7 @@ const LecturerPortal = () => {
               
               <div className="bg-indigo-600 dark:bg-indigo-500/10 border border-transparent dark:border-indigo-500/20 p-6 rounded-2xl text-white dark:text-indigo-100 shadow-sm">
                 <h3 className="text-lg font-bold mb-1">Need a change?</h3>
-                <p className="text-indigo-100 dark:text-indigo-200/70 text-sm mb-5">Initiate a swap request with another lecturer. The HOD will be notified automatically.</p>
+                <p className="text-indigo-100 dark:text-indigo-200/70 text-sm mb-5">Initiate a swap request with another lecturer. The HOD will be notified automatically upon their approval.</p>
                 <button onClick={() => setSwapModalOpen(true)} className="w-full py-2.5 bg-white dark:bg-indigo-500 text-indigo-600 dark:text-white font-semibold text-sm rounded-lg shadow-sm hover:bg-slate-50 dark:hover:bg-indigo-600 transition-colors">
                   Initiate Swap
                 </button>
@@ -208,6 +263,7 @@ const LecturerPortal = () => {
 
       {/* MODALS */}
       <AnimatePresence>
+        {/* ... (Issue Modal remains identical) ... */}
         {isIssueModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-md overflow-hidden border-none shadow-2xl">
@@ -238,6 +294,7 @@ const LecturerPortal = () => {
           </div>
         )}
 
+        {/* ... (Swap Modal remains identical) ... */}
         {isSwapModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-lg overflow-hidden border-none shadow-2xl">
@@ -293,7 +350,7 @@ const LecturerPortal = () => {
                 </div>
                 
                 <div className="pt-2">
-                  <button type="submit" className="saas-button w-full">Submit Request to HOD</button>
+                  <button type="submit" className="saas-button w-full">Send Request to Lecturer</button>
                 </div>
               </form>
             </motion.div>
