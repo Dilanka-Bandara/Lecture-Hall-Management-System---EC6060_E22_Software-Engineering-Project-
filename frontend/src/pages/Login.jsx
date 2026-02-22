@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { motion } from 'framer-motion';
+import { BookOpen, AlertCircle } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -15,30 +17,16 @@ const Login = () => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
     try {
-      // Call the global login function
       const role = await login(email, password);
-
-      // Smart Redirect based on University Role
       switch (role) {
-        case 'student':
-          navigate('/student-dashboard');
-          break;
-        case 'lecturer':
-          navigate('/lecturer-dashboard');
-          break;
-        case 'hod':
-          navigate('/hod-dashboard');
-          break;
-        case 'technical_officer':
-          navigate('/to-dashboard');
-          break;
-        case 'admin':                  // <-- ADD THIS CASE
-          navigate('/admin-dashboard'); // <-- ADD THIS REDIRECT
-          break;
-        default:
-          console.log("Unknown role received:", role); // Helpful for debugging!
+        case 'student': navigate('/student-dashboard'); break;
+        case 'lecturer': navigate('/lecturer-dashboard'); break;
+        case 'hod': navigate('/hod-dashboard'); break;
+        case 'technical_officer': navigate('/to-dashboard'); break;
+        case 'admin': navigate('/admin-dashboard'); break;
+        default: 
+          console.log("Unknown role received:", role);
           navigate('/');
       }
     } catch (err) {
@@ -49,47 +37,67 @@ const Login = () => {
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f4f7f6' }}>
-      <div style={{ padding: '40px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h2>LECTRO</h2>
-          <p>Lecture Hall Management System</p>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-[400px]"
+      >
+        <div className="text-center mb-8">
+          <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+            <BookOpen className="text-white w-6 h-6" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Log in to Lectro</h2>
+          <p className="text-slate-500 text-sm mt-1">Enter your university credentials to continue</p>
         </div>
 
-        {error && <div style={{ color: 'red', marginBottom: '15px', textAlign: 'center' }}>{error}</div>}
+        <div className="saas-card p-8">
+          {error && (
+            <div className="mb-6 p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-start text-rose-600 text-sm">
+              <AlertCircle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
-        <form onSubmit={handleLogin}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Email</label>
-            <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}
-              required 
-            />
-          </div>
-          
-          <div style={{ marginBottom: '30px' }}>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Password</label>
-            <input 
-              type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}
-              required 
-            />
-          </div>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">University Email</label>
+              <input 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="saas-input"
+                placeholder="name@university.edu"
+                required 
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+              <input 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="saas-input"
+                placeholder="••••••••"
+                required 
+              />
+            </div>
 
-          <button 
-            type="submit" 
-            disabled={isLoading}
-            style={{ width: '100%', padding: '12px', backgroundColor: '#4f46e5', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px' }}
-          >
-            {isLoading ? 'Authenticating...' : 'LOGIN'}
-          </button>
-        </form>
-      </div>
+            <button 
+              type="submit" 
+              disabled={isLoading}
+              className="saas-button w-full mt-2"
+            >
+              {isLoading ? 'Authenticating...' : 'Continue'}
+            </button>
+          </form>
+        </div>
+        
+        <p className="text-center text-xs text-slate-500 mt-6">
+          Protected by institutional single sign-on.
+        </p>
+      </motion.div>
     </div>
   );
 };
