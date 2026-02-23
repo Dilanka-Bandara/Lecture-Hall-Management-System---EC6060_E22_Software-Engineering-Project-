@@ -140,6 +140,7 @@ const getStudentAttendanceMetrics = async (studentId) => {
 };
 
 // --- NEW BATCH GENERATOR FOR PERMANENT TIMETABLES ---
+// --- NEW BATCH GENERATOR FOR PERMANENT TIMETABLES ---
 const createRecurringSchedule = async (scheduleData) => {
   const { 
     subject_id, 
@@ -147,18 +148,18 @@ const createRecurringSchedule = async (scheduleData) => {
     hall_id, 
     start_time, 
     end_time, 
-    day_of_week, // 0 = Sunday, 1 = Monday, 2 = Tuesday, etc.
-    start_date,  // e.g., '2026-02-01'
-    end_date     // e.g., '2026-05-31'
+    day_of_week, 
+    start_date,  
+    end_date,
+    target_batch // NEW: The student year to automatically enroll
   } = scheduleData;
 
+  // 1. Generate the Timetable Dates
   let currentDate = new Date(start_date);
   const endDateObj = new Date(end_date);
   const recordsToInsert = [];
 
-  // Loop through every day in the date range
   while (currentDate <= endDateObj) {
-    // Check if the current day matches the target day of the week
     if (currentDate.getDay() === parseInt(day_of_week)) {
       recordsToInsert.push({
         date: currentDate.toISOString().split('T')[0],
@@ -169,23 +170,49 @@ const createRecurringSchedule = async (scheduleData) => {
         lecturer_id
       });
     }
-    // Move to the next day
     currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  // Security check: Ensure we actually found dates to insert
   if (recordsToInsert.length === 0) {
     throw new Error("No dates match the selected day of the week in this date range.");
   }
 
-  // Perform a high-performance bulk insert into the database
+  // 2. Insert the timetable records
   await db('timetables').insert(recordsToInsert);
+
+  // 3. NEW: Auto-Enroll the Students
+  let enrolledCount = 0;
+  if (target_batch) {
+    // Find all users who are students in the selected batch
+    const students = await db('users')
+      .where({ role: 'student', batch: target_batch })
+      .select('id');
+      
+    if (students.length > 0) {
+      // Format data for bulk insertion
+      const enrollmentRecords = students.map(student => ({
+        student_id: student.id,
+        subject_id: subject_id
+      }));
+
+      // Insert enrollments. .ignore() prevents crashing if a student is already enrolled in this subject.
+      await db('student_subjects')
+        .insert(enrollmentRecords)
+        .onConflict(['student_id', 'subject_id'])
+        .ignore();
+        
+      enrolledCount = students.length;
+    }
+  }
   
   return { 
     success: true, 
-    message: `Successfully generated ${recordsToInsert.length} recurring classes for the semester.` 
+    message: `Generated ${recordsToInsert.length} classes and auto-enrolled ${enrolledCount} students from ${target_batch}.` 
   };
 };
+
+
+
 
 // DON'T FORGET to add it to your module.exports at the bottom!
 module.exports = {
