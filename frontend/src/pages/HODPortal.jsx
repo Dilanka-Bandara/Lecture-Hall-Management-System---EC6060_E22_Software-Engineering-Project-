@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, Bell, LogOut, CheckCircle, XCircle, CalendarCheck, Plus, Trash2, Calendar, BookOpen, X } from 'lucide-react';
+import { ShieldCheck, Bell, LogOut, CheckCircle, XCircle, CalendarCheck, Plus, Trash2, Calendar, BookOpen, X, Repeat } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import NotificationPanel from '../components/NotificationPanel';
@@ -15,7 +15,15 @@ const HODPortal = () => {
   
   const [isScheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [isNotifPanelOpen, setIsNotifPanelOpen] = useState(false);
+  
+  // NEW: Toggle between single and recurring scheduling modes
+  const [scheduleMode, setScheduleMode] = useState('single'); 
+  
+  // Existing Form for Single Classes
   const [scheduleForm, setScheduleForm] = useState({ subject_id: '', lecturer_id: '', hall_id: '', date: '', start_time: '', end_time: '' });
+  
+  // NEW: Form for Bulk Recurring Classes
+  const [recurringForm, setRecurringForm] = useState({ subject_id: '', lecturer_id: '', hall_id: '', day_of_week: '', start_date: '', end_date: '', start_time: '', end_time: '' });
 
   useEffect(() => {
     fetchPendingSwaps();
@@ -69,13 +77,22 @@ const HODPortal = () => {
   const handleCreateSchedule = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/timetables/department/new', scheduleForm);
-      showNotification("New timetable record created successfully.");
+      if (scheduleMode === 'single') {
+        // Original Single Schedule API Call
+        await api.post('/timetables/department/new', scheduleForm);
+        showNotification("New timetable record created successfully.");
+        setScheduleForm({ subject_id: '', lecturer_id: '', hall_id: '', date: '', start_time: '', end_time: '' });
+      } else {
+        // NEW Recurring Batch API Call
+        await api.post('/timetables/department/recurring', recurringForm);
+        showNotification("Semester batch schedule generated successfully!");
+        setRecurringForm({ subject_id: '', lecturer_id: '', hall_id: '', day_of_week: '', start_date: '', end_date: '', start_time: '', end_time: '' });
+      }
+      
       setScheduleModalOpen(false);
       fetchAllSchedules();
-      setScheduleForm({ subject_id: '', lecturer_id: '', hall_id: '', date: '', start_time: '', end_time: '' });
     } catch (error) {
-      alert("Failed to create schedule. Ensure you are using valid IDs.");
+      alert("Failed to create schedule. " + (error.response?.data?.error || "Check inputs."));
     }
   };
 
@@ -106,14 +123,14 @@ const HODPortal = () => {
       <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between z-10 hidden md:flex transition-colors duration-300">
         <div>
           <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-800">
-            <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center mr-2.5">
+            <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center mr-2.5 shadow-lg shadow-indigo-500/30">
               <BookOpen className="text-white w-4 h-4" />
             </div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Lectro</h1>
           </div>
           <nav className="p-4 space-y-1 mt-2">
-            <button className="w-full flex items-center px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-md text-sm font-medium transition-colors">
-              <CalendarCheck className="w-4 h-4 mr-3 text-indigo-500 dark:text-indigo-400" /> Control Panel
+            <button className="w-full flex items-center px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 rounded-md text-sm font-medium transition-colors">
+              <CalendarCheck className="w-4 h-4 mr-3" /> Control Panel
             </button>
             <button onClick={() => setIsNotifPanelOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white rounded-md text-sm font-medium transition-colors">
               <Bell className="w-4 h-4 mr-3 text-slate-400 dark:text-slate-500" /> Notifications
@@ -144,7 +161,7 @@ const HODPortal = () => {
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Department schedule and override management.</p>
           </div>
           <div className="flex items-center space-x-4 mt-4 md:mt-0">
-            <button onClick={() => setScheduleModalOpen(true)} className="saas-button py-2 flex items-center">
+            <button onClick={() => { setScheduleMode('single'); setScheduleModalOpen(true); }} className="saas-button py-2 flex items-center">
               <Plus className="w-4 h-4 mr-2" /> New Record
             </button>
             <ThemeToggle />
@@ -235,58 +252,110 @@ const HODPortal = () => {
 
       <AnimatePresence>
         {isScheduleModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-lg overflow-hidden border-none shadow-2xl">
-              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Schedule New Class</h3>
-                <button onClick={() => setScheduleModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><X className="w-4 h-4" /></button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm overflow-y-auto">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-lg overflow-hidden border-none shadow-2xl my-8">
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Schedule Management</h3>
+                <button onClick={() => setScheduleModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><X className="w-5 h-5" /></button>
               </div>
-              <form onSubmit={handleCreateSchedule} className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Subject</label>
-                    <select required value={scheduleForm.subject_id} onChange={e => setScheduleForm({...scheduleForm, subject_id: e.target.value})} className="saas-input">
-                      <option value="">Select Subject...</option>
-                      {systemData.subjects.map(s => <option key={s.id} value={s.id}>{s.subject_code}</option>)}
-                    </select>
-                  </div>
+
+              <div className="p-6">
+                {/* NEW: Toggle Switch for Single vs Recurring */}
+                <div className="flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl mb-6">
+                  <button 
+                    onClick={() => setScheduleMode('single')}
+                    className={`flex-1 flex items-center justify-center py-2 text-sm font-semibold rounded-lg transition-all ${scheduleMode === 'single' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                  >
+                    <Calendar className="w-4 h-4 mr-2" /> Single Class
+                  </button>
+                  <button 
+                    onClick={() => setScheduleMode('recurring')}
+                    className={`flex-1 flex items-center justify-center py-2 text-sm font-semibold rounded-lg transition-all ${scheduleMode === 'recurring' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                  >
+                    <Repeat className="w-4 h-4 mr-2" /> Recurring Batch
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateSchedule} className="space-y-4">
                   
-                  <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Lecturer</label>
-                    <select required value={scheduleForm.lecturer_id} onChange={e => setScheduleForm({...scheduleForm, lecturer_id: e.target.value})} className="saas-input">
-                      <option value="">Assign Lecturer...</option>
-                      {systemData.lecturers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                    </select>
-                  </div>
-                  
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Lecture Hall</label>
-                    <select required value={scheduleForm.hall_id} onChange={e => setScheduleForm({...scheduleForm, hall_id: e.target.value})} className="saas-input">
-                      <option value="">Select Hall...</option>
-                      {systemData.halls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                    </select>
+                  {/* Common Fields for both modes */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Subject</label>
+                      <select required value={scheduleMode === 'single' ? scheduleForm.subject_id : recurringForm.subject_id} onChange={e => scheduleMode === 'single' ? setScheduleForm({...scheduleForm, subject_id: e.target.value}) : setRecurringForm({...recurringForm, subject_id: e.target.value})} className="saas-input">
+                        <option value="">Select Subject...</option>
+                        {systemData.subjects.map(s => <option key={s.id} value={s.id}>{s.subject_code}</option>)}
+                      </select>
+                    </div>
+                    
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Lecturer</label>
+                      <select required value={scheduleMode === 'single' ? scheduleForm.lecturer_id : recurringForm.lecturer_id} onChange={e => scheduleMode === 'single' ? setScheduleForm({...scheduleForm, lecturer_id: e.target.value}) : setRecurringForm({...recurringForm, lecturer_id: e.target.value})} className="saas-input">
+                        <option value="">Assign Lecturer...</option>
+                        {systemData.lecturers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                      </select>
+                    </div>
+                    
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Lecture Hall</label>
+                      <select required value={scheduleMode === 'single' ? scheduleForm.hall_id : recurringForm.hall_id} onChange={e => scheduleMode === 'single' ? setScheduleForm({...scheduleForm, hall_id: e.target.value}) : setRecurringForm({...recurringForm, hall_id: e.target.value})} className="saas-input">
+                        <option value="">Select Hall...</option>
+                        {systemData.halls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Conditional Fields based on Mode */}
+                    {scheduleMode === 'single' ? (
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Date</label>
+                        <input type="date" required value={scheduleForm.date} onChange={e => setScheduleForm({...scheduleForm, date: e.target.value})} className="saas-input" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="col-span-2">
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Day of the Week</label>
+                          <select required value={recurringForm.day_of_week} onChange={e => setRecurringForm({...recurringForm, day_of_week: e.target.value})} className="saas-input">
+                            <option value="">Select Day...</option>
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                            <option value="0">Sunday</option>
+                          </select>
+                        </div>
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Start Date</label>
+                          <input type="date" required value={recurringForm.start_date} onChange={e => setRecurringForm({...recurringForm, start_date: e.target.value})} className="saas-input" />
+                        </div>
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">End Date</label>
+                          <input type="date" required value={recurringForm.end_date} onChange={e => setRecurringForm({...recurringForm, end_date: e.target.value})} className="saas-input" />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Time Fields */}
+                    <div className="col-span-2 grid grid-cols-2 gap-4 mt-2">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Start Time</label>
+                        <input type="time" required value={scheduleMode === 'single' ? scheduleForm.start_time : recurringForm.start_time} onChange={e => scheduleMode === 'single' ? setScheduleForm({...scheduleForm, start_time: e.target.value}) : setRecurringForm({...recurringForm, start_time: e.target.value})} className="saas-input px-2" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">End Time</label>
+                        <input type="time" required value={scheduleMode === 'single' ? scheduleForm.end_time : recurringForm.end_time} onChange={e => scheduleMode === 'single' ? setScheduleForm({...scheduleForm, end_time: e.target.value}) : setRecurringForm({...recurringForm, end_time: e.target.value})} className="saas-input px-2" />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Date</label>
-                    <input type="date" required value={scheduleForm.date} onChange={e => setScheduleForm({...scheduleForm, date: e.target.value})} className="saas-input" />
+                  <div className="pt-4">
+                    <button type="submit" className="saas-button w-full py-3">
+                      {scheduleMode === 'single' ? 'Confirm Single Schedule' : 'Generate Semester Batch'}
+                    </button>
                   </div>
-                  
-                  <div className="col-span-2 sm:col-span-1 grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Start</label>
-                      <input type="time" required value={scheduleForm.start_time} onChange={e => setScheduleForm({...scheduleForm, start_time: e.target.value})} className="saas-input px-2" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">End</label>
-                      <input type="time" required value={scheduleForm.end_time} onChange={e => setScheduleForm({...scheduleForm, end_time: e.target.value})} className="saas-input px-2" />
-                    </div>
-                  </div>
-                </div>
-                <div className="pt-2">
-                  <button type="submit" className="saas-button w-full">Confirm Schedule</button>
-                </div>
-              </form>
+                </form>
+              </div>
             </motion.div>
           </div>
         )}
