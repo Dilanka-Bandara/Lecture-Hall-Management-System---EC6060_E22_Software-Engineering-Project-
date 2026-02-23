@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Bell, LogOut, MapPin, AlertTriangle, RefreshCw, X, CheckCircle, BookOpen, UserCheck, Filter } from 'lucide-react';
+import { Calendar, Bell, LogOut, MapPin, AlertTriangle, RefreshCw, X, CheckCircle, BookOpen, UserCheck, Filter, Clock, Hourglass, Search, CheckSquare, Square } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationPanel from '../components/NotificationPanel';
 
-// UX UPGRADE: Helper function to generate the next 60 valid dates cleanly
+// Helper function to generate the next 60 valid dates cleanly
 const generateFutureDates = () => {
   const dates = [];
   const today = new Date();
@@ -16,13 +16,8 @@ const generateFutureDates = () => {
     d.setDate(today.getDate() + i);
     
     dates.push({
-      value: d.toISOString().split('T')[0], // The format the database needs (YYYY-MM-DD)
-      label: d.toLocaleDateString('en-US', { 
-        weekday: 'short', 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
-      }) // The beautiful format the user sees (Mon, Feb 23, 2026)
+      value: d.toISOString().split('T')[0],
+      label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
     });
   }
   return dates;
@@ -33,19 +28,23 @@ const LecturerPortal = () => {
   const [timetable, setTimetable] = useState([]);
   const [pendingSwaps, setPendingSwaps] = useState([]); 
   const [loading, setLoading] = useState(true);
-  
   const [systemData, setSystemData] = useState({ lecturers: [], halls: [], subjects: [] });
-  
+
+  // Real-Time and Countdown States
+  const [currentTime, setCurrentTime] = useState(new Date());
+
   // Modal States
   const [isSwapModalOpen, setSwapModalOpen] = useState(false);
   const [isIssueModalOpen, setIssueModalOpen] = useState(false);
   const [isNotifPanelOpen, setIsNotifPanelOpen] = useState(false);
+  const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
   const [notification, setNotification] = useState(null);
 
   // Attendance States
   const [isAttendanceModalOpen, setAttendanceModalOpen] = useState(false);
   const [activeSession, setActiveSession] = useState(null);
   const [studentsList, setStudentsList] = useState([]);
+  const [searchStudent, setSearchStudent] = useState('');
   const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
 
   // Form States
@@ -55,11 +54,7 @@ const LecturerPortal = () => {
   // Schedule Filter States
   const [scheduleTab, setScheduleTab] = useState('upcoming'); 
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
-
-  // Generate our custom date options once when the component loads
   const futureDateOptions = generateFutureDates();
-  
-  // Notification Count State
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   useEffect(() => {
@@ -67,9 +62,12 @@ const LecturerPortal = () => {
     fetchSystemData();
     fetchPendingSwaps(); 
     fetchUnreadNotifs();
+
+    // Real-time clock interval
+    const timerId = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timerId);
   }, []);
 
-  // Fetch unread count on initial load
   const fetchUnreadNotifs = async () => {
     try {
       const res = await api.get('/notifications');
@@ -152,7 +150,8 @@ const LecturerPortal = () => {
   const openAttendanceModal = async (session) => {
     setActiveSession(session);
     setAttendanceModalOpen(true);
-    setStudentsList([]); 
+    setStudentsList([]);
+    setSearchStudent('');
     try {
       const res = await api.get(`/timetables/${session.timetable_id}/students`);
       const initializedStudents = res.data.map(student => ({ ...student, is_present: true }));
@@ -166,6 +165,11 @@ const LecturerPortal = () => {
     setStudentsList(prev => prev.map(s => 
       s.student_id === studentId ? { ...s, is_present: !s.is_present } : s
     ));
+  };
+
+  // NEW: Bulk Attendance Actions
+  const markAllAttendance = (isPresent) => {
+    setStudentsList(prev => prev.map(s => ({ ...s, is_present: isPresent })));
   };
 
   const handleAttendanceSubmit = async (e) => {
@@ -189,7 +193,7 @@ const LecturerPortal = () => {
   };
 
   const getDisplayedSchedule = () => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = currentTime.toISOString().split('T')[0];
     if (scheduleTab === 'upcoming') {
       return timetable.filter(t => t.date.split('T')[0] >= todayStr);
     }
@@ -202,7 +206,41 @@ const LecturerPortal = () => {
     return timetable;
   };
 
+  // NEW: Next Lecture Logic
+  const getNextLectureDetails = () => {
+    if (!timetable.length) return null;
+    
+    const upcoming = timetable.find(t => {
+      const lectureStart = new Date(`${t.date.split('T')[0]}T${t.start_time}`);
+      return lectureStart > currentTime;
+    });
+
+    if (!upcoming) return null;
+
+    const targetDate = new Date(`${upcoming.date.split('T')[0]}T${upcoming.start_time}`);
+    const diff = targetDate - currentTime;
+    
+    const h = Math.floor(diff / (1000 * 60 * 60));
+    const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const s = Math.floor((diff % (1000 * 60)) / 1000);
+
+    return { 
+      lecture: upcoming, 
+      countdown: `${h}h ${m}m ${s}s`,
+      isImminent: h === 0 && m < 30 
+    };
+  };
+
+  const nextLectureData = getNextLectureDetails();
   const displayedSchedule = getDisplayedSchedule();
+
+  // Search Filter for Attendance
+  const filteredStudentsList = studentsList.filter(s => 
+    s.name.toLowerCase().includes(searchStudent.toLowerCase()) || 
+    s.university_id.toLowerCase().includes(searchStudent.toLowerCase())
+  );
+  
+  const presentCount = studentsList.filter(s => s.is_present).length;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#0B1120] transition-colors duration-300">
@@ -221,33 +259,34 @@ const LecturerPortal = () => {
       <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between z-10 hidden md:flex transition-colors duration-300">
         <div>
           <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-800">
-            <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center mr-2.5">
+            <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center mr-2.5 shadow-lg shadow-indigo-500/30">
               <BookOpen className="text-white w-4 h-4" />
             </div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Lectro</h1>
           </div>
           <nav className="p-4 space-y-1 mt-2">
-            <button className="w-full flex items-center px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-md text-sm font-medium transition-colors">
-              <Calendar className="w-4 h-4 mr-3 text-indigo-500 dark:text-indigo-400" /> My Schedule
+            <button className="w-full flex items-center px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 rounded-md text-sm font-medium transition-colors">
+              <Calendar className="w-4 h-4 mr-3" /> Dashboard
+            </button>
+            <button onClick={() => setIsTimetableModalOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white rounded-md text-sm font-medium transition-colors">
+              <BookOpen className="w-4 h-4 mr-3" /> Full Timetable
             </button>
             <button onClick={() => setSwapModalOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white rounded-md text-sm font-medium transition-colors">
-              <RefreshCw className="w-4 h-4 mr-3 text-slate-400 dark:text-slate-500" /> Request Swap
+              <RefreshCw className="w-4 h-4 mr-3" /> Request Swap
             </button>
             <button onClick={() => setIssueModalOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-md text-sm font-medium transition-colors">
-              <AlertTriangle className="w-4 h-4 mr-3 text-slate-400 dark:text-slate-500 group-hover:text-rose-500" /> Report Issue
+              <AlertTriangle className="w-4 h-4 mr-3 group-hover:text-rose-500" /> Report Issue
             </button>
             
-            {/* UPDATED NOTIFICATION BUTTON WITH RED DOT */}
             <button onClick={() => setIsNotifPanelOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white rounded-md text-sm font-medium transition-colors">
               <div className="relative mr-3">
-                <Bell className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                <Bell className="w-4 h-4" />
                 {unreadNotifCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-rose-500 rounded-full animate-pulse border border-white dark:border-slate-900"></span>
                 )}
               </div>
               Notifications
             </button>
-            
           </nav>
         </div>
         
@@ -273,10 +312,17 @@ const LecturerPortal = () => {
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Faculty Dashboard</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Welcome back, {user?.name?.split(' ')[0] || 'Dr.'}</p>
           </div>
+          
           <div className="flex items-center space-x-4 mt-4 md:mt-0">
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-300">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </p>
+            <div className="flex flex-col items-end mr-4">
+              <p className="text-sm font-bold text-slate-900 dark:text-white flex items-center">
+                <Clock className="w-3.5 h-3.5 mr-1.5 text-indigo-500" />
+                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
             <ThemeToggle />
           </div>
         </header>
@@ -285,10 +331,11 @@ const LecturerPortal = () => {
           <div className="flex h-32 items-center justify-center text-slate-500 dark:text-slate-400 text-sm">Loading schedule...</div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-2">
+            <div className="xl:col-span-2 space-y-6">
               
+              {/* Alert for Pending Swaps */}
               {pendingSwaps.length > 0 && (
-                <div className="mb-8">
+                <div>
                   <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center text-amber-600 dark:text-amber-500">
                     <AlertTriangle className="w-4 h-4 mr-2" /> Action Required: Swap Requests
                   </h3>
@@ -316,70 +363,99 @@ const LecturerPortal = () => {
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center">
-                  <Calendar className="w-4 h-4 mr-2 text-indigo-500" /> Teaching Schedule
-                </h3>
-                
-                <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <button onClick={() => setScheduleTab('upcoming')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'upcoming' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>Upcoming</button>
-                  <button onClick={() => setScheduleTab('past')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'past' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>Previous</button>
-                  <button onClick={() => setScheduleTab('filter')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'filter' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>By Date</button>
-                </div>
-              </div>
-
-              <AnimatePresence>
-                {scheduleTab === 'filter' && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-4 overflow-hidden">
-                    <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl shadow-sm">
-                      <Filter className="w-4 h-4 text-indigo-500 mr-2" />
-                      <span className="text-sm font-medium text-slate-600 dark:text-slate-400 mr-3">Select Date:</span>
-                      <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="saas-input py-1.5 max-w-[200px]" />
+              {/* NEW: Countdown Widget */}
+              {nextLectureData && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                  className={`saas-card p-6 flex flex-col md:flex-row items-center justify-between border-l-4 ${nextLectureData.isImminent ? 'border-l-rose-500 bg-rose-50/30 dark:bg-rose-900/10' : 'border-l-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/10'}`}
+                >
+                  <div className="flex items-center mb-4 md:mb-0">
+                    <div className={`p-3 rounded-full mr-4 ${nextLectureData.isImminent ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400' : 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400'}`}>
+                      <Hourglass className={`w-6 h-6 ${nextLectureData.isImminent ? 'animate-pulse' : ''}`} />
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              
-              <div className="space-y-3">
-                {displayedSchedule.length === 0 ? (
-                  <div className="saas-card p-8 text-center text-sm text-slate-500 dark:text-slate-400">
-                    {scheduleTab === 'filter' ? 'No lectures scheduled for this date.' : `No ${scheduleTab} lectures found.`}
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Your Next Class</p>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">{nextLectureData.lecture.subject_name}</h3>
+                      <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mt-1 flex items-center">
+                        <MapPin className="w-3.5 h-3.5 mr-1" /> {nextLectureData.lecture.hall_name} • {nextLectureData.lecture.start_time.slice(0, 5)}
+                      </p>
+                    </div>
                   </div>
-                ) : (
-                  displayedSchedule.map((session) => (
-                    <div key={session.timetable_id} className="saas-card p-5 flex flex-col sm:flex-row sm:items-center justify-between hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-colors">
-                      <div className="flex items-start sm:items-center space-x-4">
-                        <div className="w-20 text-center flex-shrink-0">
-                          <span className="block text-sm font-bold text-slate-900 dark:text-white">{session.start_time.slice(0, 5)}</span>
-                          <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">{session.end_time.slice(0, 5)}</span>
-                        </div>
-                        
-                        <div className="h-10 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block mx-2"></div>
-                        
-                        <div>
-                          <div className="flex items-center space-x-2 mb-1">
-                            <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded uppercase tracking-wider">{session.subject_code}</span>
-                            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 ml-2">{session.date.split('T')[0]}</span>
-                          </div>
-                          <h3 className="text-base font-semibold text-slate-900 dark:text-white">{session.subject_name}</h3>
-                          <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mt-1">
-                            <MapPin className="w-3.5 h-3.5 mr-1 text-slate-400 dark:text-slate-500" /> {session.hall_name}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-4 sm:mt-0 flex justify-end">
-                        <button 
-                          onClick={() => openAttendanceModal(session)}
-                          className="px-4 py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 font-semibold text-xs rounded-lg transition-colors flex items-center border border-emerald-200 dark:border-emerald-500/30"
-                        >
-                          <UserCheck className="w-4 h-4 mr-1.5" /> Mark Attendance
-                        </button>
-                      </div>
+                  <div className="text-center md:text-right bg-white dark:bg-slate-900 px-6 py-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Starts In</p>
+                    <span className={`text-2xl font-extrabold tracking-tight tabular-nums ${nextLectureData.isImminent ? 'text-rose-600 dark:text-rose-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                      {nextLectureData.countdown}
+                    </span>
+                  </div>
+                </motion.div>
+              )}
 
+              {/* Schedule Controls & List */}
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center">
+                    <Calendar className="w-4 h-4 mr-2 text-indigo-500" /> Teaching Schedule
+                  </h3>
+                  
+                  <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <button onClick={() => setScheduleTab('upcoming')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'upcoming' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>Upcoming</button>
+                    <button onClick={() => setScheduleTab('past')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'past' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>Previous</button>
+                    <button onClick={() => setScheduleTab('filter')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${scheduleTab === 'filter' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>By Date</button>
+                  </div>
+                </div>
+
+                <AnimatePresence>
+                  {scheduleTab === 'filter' && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-4 overflow-hidden">
+                      <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl shadow-sm">
+                        <Filter className="w-4 h-4 text-indigo-500 mr-2" />
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-400 mr-3">Select Date:</span>
+                        <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="saas-input py-1.5 max-w-[200px]" />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+                <div className="space-y-3">
+                  {displayedSchedule.length === 0 ? (
+                    <div className="saas-card p-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                      {scheduleTab === 'filter' ? 'No lectures scheduled for this date.' : `No ${scheduleTab} lectures found.`}
                     </div>
-                  ))
-                )}
+                  ) : (
+                    displayedSchedule.map((session) => (
+                      <div key={session.timetable_id} className="saas-card p-5 flex flex-col sm:flex-row sm:items-center justify-between hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-colors">
+                        <div className="flex items-start sm:items-center space-x-4">
+                          <div className="w-20 text-center flex-shrink-0">
+                            <span className="block text-sm font-bold text-slate-900 dark:text-white">{session.start_time.slice(0, 5)}</span>
+                            <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">{session.end_time.slice(0, 5)}</span>
+                          </div>
+                          
+                          <div className="h-10 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block mx-2"></div>
+                          
+                          <div>
+                            <div className="flex items-center space-x-2 mb-1">
+                              <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded uppercase tracking-wider">{session.subject_code}</span>
+                              <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 ml-2">{session.date.split('T')[0]}</span>
+                            </div>
+                            <h3 className="text-base font-semibold text-slate-900 dark:text-white">{session.subject_name}</h3>
+                            <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mt-1">
+                              <MapPin className="w-3.5 h-3.5 mr-1 text-slate-400 dark:text-slate-500" /> {session.hall_name}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-4 sm:mt-0 flex justify-end">
+                          <button 
+                            onClick={() => openAttendanceModal(session)}
+                            className="px-4 py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 font-semibold text-xs rounded-lg transition-colors flex items-center border border-emerald-200 dark:border-emerald-500/30"
+                          >
+                            <UserCheck className="w-4 h-4 mr-1.5" /> Mark Attendance
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
 
@@ -407,9 +483,10 @@ const LecturerPortal = () => {
         )}
       </main>
 
-      {/* MODALS */}
+      {/* --- MODALS --- */}
       <AnimatePresence>
         
+        {/* Issue Modal */}
         {isIssueModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-md overflow-hidden border-none shadow-2xl">
@@ -440,6 +517,7 @@ const LecturerPortal = () => {
           </div>
         )}
 
+        {/* Swap Modal */}
         {isSwapModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-lg overflow-hidden border-none shadow-2xl">
@@ -475,20 +553,12 @@ const LecturerPortal = () => {
                     </select>
                   </div>
                   
-                  {/* UX UPGRADE: The Custom Smart Date Dropdown */}
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Proposed Date</label>
-                    <select 
-                      required 
-                      value={swapForm.proposed_date} 
-                      onChange={e => setSwapForm({...swapForm, proposed_date: e.target.value})} 
-                      className="saas-input"
-                    >
+                    <select required value={swapForm.proposed_date} onChange={e => setSwapForm({...swapForm, proposed_date: e.target.value})} className="saas-input">
                       <option value="">Select Date...</option>
                       {futureDateOptions.map(dateObj => (
-                        <option key={dateObj.value} value={dateObj.value}>
-                          {dateObj.label}
-                        </option>
+                        <option key={dateObj.value} value={dateObj.value}>{dateObj.label}</option>
                       ))}
                     </select>
                   </div>
@@ -513,7 +583,6 @@ const LecturerPortal = () => {
                       <option value="17:00-19:00">05:00 PM - 07:00 PM</option>
                     </select>
                   </div>
-
                 </div>
                 <div className="pt-2">
                   <button type="submit" className="saas-button w-full">Send Request to Lecturer</button>
@@ -523,6 +592,7 @@ const LecturerPortal = () => {
           </div>
         )}
 
+        {/* Upgraded Attendance Modal */}
         {isAttendanceModalOpen && activeSession && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="saas-card w-full max-w-lg overflow-hidden border-none shadow-2xl flex flex-col max-h-[85vh]">
@@ -537,22 +607,54 @@ const LecturerPortal = () => {
                 <button onClick={() => setAttendanceModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><X className="w-5 h-5" /></button>
               </div>
 
+              {/* NEW: Search and Bulk Action Tools */}
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-4">
+                
+                {/* Visual Stat Summary */}
+                <div className="flex justify-between items-center bg-indigo-50 dark:bg-indigo-500/10 p-3 rounded-lg border border-indigo-100 dark:border-indigo-500/20">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Enrolled: <span className="text-indigo-600 dark:text-indigo-400">{studentsList.length}</span></span>
+                  <div className="flex space-x-3 text-sm font-bold">
+                     <span className="text-emerald-600 dark:text-emerald-400">{presentCount} Present</span>
+                     <span className="text-rose-600 dark:text-rose-400">{studentsList.length - presentCount} Absent</span>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search student by name or ID..." 
+                    value={searchStudent}
+                    onChange={(e) => setSearchStudent(e.target.value)}
+                    className="saas-input pl-10"
+                  />
+                </div>
+                
+                <div className="flex space-x-2">
+                  <button onClick={() => markAllAttendance(true)} className="flex-1 flex items-center justify-center py-2 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 text-xs font-bold rounded-lg transition-colors border border-transparent hover:border-emerald-200 dark:hover:border-emerald-500/30">
+                     <CheckSquare className="w-4 h-4 mr-1.5" /> Mark All Present
+                  </button>
+                  <button onClick={() => markAllAttendance(false)} className="flex-1 flex items-center justify-center py-2 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/10 text-slate-700 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 text-xs font-bold rounded-lg transition-colors border border-transparent hover:border-rose-200 dark:hover:border-rose-500/30">
+                     <Square className="w-4 h-4 mr-1.5" /> Mark All Absent
+                  </button>
+                </div>
+              </div>
+
               <div className="p-6 overflow-y-auto flex-1 bg-slate-50/30 dark:bg-[#0B1120]/50">
                 {studentsList.length === 0 ? (
                   <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">Loading students...</div>
+                ) : filteredStudentsList.length === 0 ? (
+                   <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">No students match your search.</div>
                 ) : (
                   <div className="space-y-3">
-                    {studentsList.map(student => (
-                      <div key={student.student_id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-colors">
+                    {filteredStudentsList.map(student => (
+                      <div key={student.student_id} onClick={() => toggleStudentAttendance(student.student_id)} className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-colors ${student.is_present ? 'bg-emerald-50/50 dark:bg-emerald-500/5 border-emerald-200 dark:border-emerald-500/30' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/30'}`}>
                         <div>
                           <p className="text-sm font-semibold text-slate-900 dark:text-white">{student.name}</p>
                           <p className="text-xs text-slate-500 dark:text-slate-400">{student.university_id}</p>
                         </div>
                         
-                        <div 
-                          onClick={() => toggleStudentAttendance(student.student_id)}
-                          className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ${student.is_present ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                        >
+                        <div className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${student.is_present ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
                           <motion.div 
                             layout 
                             className="bg-white w-4 h-4 rounded-full shadow-sm"
@@ -580,9 +682,58 @@ const LecturerPortal = () => {
           </div>
         )}
 
+        {/* Full Timetable Modal Component */}
+        {isTimetableModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-900/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} 
+              className="saas-card w-full max-w-4xl max-h-[85vh] overflow-hidden border-none shadow-2xl flex flex-col"
+            >
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center">
+                    <Calendar className="w-5 h-5 mr-2 text-indigo-500" /> Permanent Timetable Archive
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">All upcoming assigned lectures.</p>
+                </div>
+                <button onClick={() => setIsTimetableModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-1 bg-slate-50/30 dark:bg-[#0B1120]/50 space-y-6">
+                {timetable.length === 0 ? (
+                   <div className="text-center py-10 text-slate-500 dark:text-slate-400">No upcoming classes found in the system.</div>
+                ) : (
+                  [...new Set(timetable.map(t => t.date.split('T')[0]))].map(dateStr => (
+                    <div key={dateStr}>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 sticky top-0 bg-slate-50 dark:bg-[#0B1120] py-2 z-10">
+                        {new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {timetable.filter(t => t.date.split('T')[0] === dateStr).map(session => (
+                           <div key={session.timetable_id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
+                             <div className="flex justify-between items-start mb-2">
+                                <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded">{session.subject_code}</span>
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                                  {session.start_time.slice(0, 5)} - {session.end_time.slice(0, 5)}
+                                </span>
+                             </div>
+                             <h5 className="font-semibold text-slate-900 dark:text-white text-sm mb-2">{session.subject_name}</h5>
+                             <div className="flex justify-between items-center text-xs text-slate-500 dark:text-slate-400">
+                               <span className="flex items-center"><MapPin className="w-3.5 h-3.5 mr-1" /> {session.hall_name}</span>
+                             </div>
+                           </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
       </AnimatePresence>
 
-      {/* UPDATED NOTIFICATION PANEL WITH SYNC PROP */}
       <NotificationPanel 
         isOpen={isNotifPanelOpen} 
         onClose={() => setIsNotifPanelOpen(false)} 
