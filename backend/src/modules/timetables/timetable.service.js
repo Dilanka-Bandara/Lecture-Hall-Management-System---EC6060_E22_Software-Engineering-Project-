@@ -139,6 +139,55 @@ const getStudentAttendanceMetrics = async (studentId) => {
   });
 };
 
+// --- NEW BATCH GENERATOR FOR PERMANENT TIMETABLES ---
+const createRecurringSchedule = async (scheduleData) => {
+  const { 
+    subject_id, 
+    lecturer_id, 
+    hall_id, 
+    start_time, 
+    end_time, 
+    day_of_week, // 0 = Sunday, 1 = Monday, 2 = Tuesday, etc.
+    start_date,  // e.g., '2026-02-01'
+    end_date     // e.g., '2026-05-31'
+  } = scheduleData;
+
+  let currentDate = new Date(start_date);
+  const endDateObj = new Date(end_date);
+  const recordsToInsert = [];
+
+  // Loop through every day in the date range
+  while (currentDate <= endDateObj) {
+    // Check if the current day matches the target day of the week
+    if (currentDate.getDay() === parseInt(day_of_week)) {
+      recordsToInsert.push({
+        date: currentDate.toISOString().split('T')[0],
+        start_time,
+        end_time,
+        subject_id,
+        hall_id,
+        lecturer_id
+      });
+    }
+    // Move to the next day
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  // Security check: Ensure we actually found dates to insert
+  if (recordsToInsert.length === 0) {
+    throw new Error("No dates match the selected day of the week in this date range.");
+  }
+
+  // Perform a high-performance bulk insert into the database
+  await db('timetables').insert(recordsToInsert);
+  
+  return { 
+    success: true, 
+    message: `Successfully generated ${recordsToInsert.length} recurring classes for the semester.` 
+  };
+};
+
+// DON'T FORGET to add it to your module.exports at the bottom!
 module.exports = {
   getTimetableForStudent,
   getTimetableForLecturer,
@@ -147,5 +196,7 @@ module.exports = {
   getAllSchedules,
   createSchedule,
   deleteSchedule,
-  getStudentAttendanceMetrics
+  getStudentAttendanceMetrics,
+  createRecurringSchedule // <-- Add this
 };
+
