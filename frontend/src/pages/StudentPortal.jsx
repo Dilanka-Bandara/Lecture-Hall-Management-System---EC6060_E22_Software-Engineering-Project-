@@ -155,7 +155,32 @@ const StudentPortal = () => {
             {/* Left Column: Countdown & Today's Classes */}
             <div className="xl:col-span-2 space-y-6">
               
-              {/* NEW: Dynamic Countdown Widget */}
+              {/* NEW: Student Profile Summary Widget */}
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                className="saas-card p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4"
+              >
+                <div className="flex items-center space-x-5">
+                  <div className="w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 flex items-center justify-center font-bold text-2xl shadow-inner">
+                    {user?.name?.charAt(0) || 'S'}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">{user?.name || 'Student Name'}</h2>
+                    <div className="flex flex-wrap items-center mt-2 gap-2">
+                      <span className="flex items-center bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                        REG NO: {user?.university_id || 'N/A'}
+                      </span>
+                      {user?.batch && (
+                        <span className="flex items-center bg-indigo-50 dark:bg-indigo-500/10 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                          {user.batch}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Dynamic Countdown Widget */}
               {nextLectureData && (
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
