@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Bell, LogOut, MapPin, AlertTriangle, RefreshCw, X, CheckCircle, BookOpen, UserCheck, Filter, Clock, Hourglass, Search, CheckSquare, Square } from 'lucide-react';
+import { Calendar, Bell, LogOut, MapPin, AlertTriangle, RefreshCw, X, CheckCircle, BookOpen, UserCheck, Filter, Clock, Hourglass, Search, CheckSquare, Square,MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationPanel from '../components/NotificationPanel';
+import { useNavigate } from "react-router-dom";
+import ChatPanel from "../components/ChatPanel";
 
 // Helper function to generate the next 60 valid dates cleanly
 const generateFutureDates = () => {
@@ -29,6 +31,8 @@ const LecturerPortal = () => {
   const [pendingSwaps, setPendingSwaps] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [systemData, setSystemData] = useState({ lecturers: [], halls: [], subjects: [] });
+  const navigate = useNavigate();
+  const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
 
   // Real-Time and Countdown States
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -287,6 +291,12 @@ const LecturerPortal = () => {
               </div>
               Notifications
             </button>
+            <button onClick={() => setIsChatPanelOpen(true)} className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white rounded-md text-sm font-medium transition-colors">
+            <div className="relative mr-3">
+              <MessageCircle className="w-4 h-4" />
+            </div>
+            Chat
+          </button>
           </nav>
         </div>
         
@@ -738,6 +748,10 @@ const LecturerPortal = () => {
         isOpen={isNotifPanelOpen} 
         onClose={() => setIsNotifPanelOpen(false)} 
         onNotificationsUpdate={(count) => setUnreadNotifCount(count)} 
+      />
+      <ChatPanel 
+        isOpen={isChatPanelOpen}
+        onClose={() => setIsChatPanelOpen(false)}
       />
 
     </div>
