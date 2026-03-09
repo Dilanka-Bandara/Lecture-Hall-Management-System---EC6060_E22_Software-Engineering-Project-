@@ -1,15 +1,20 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http'); // <-- ADD THIS
 const cors = require('cors');
+const socketUtil = require('./config/socket'); // <-- ADD THIS
 const adminRoutes = require('./modules/admin/admin.routes');
 const notificationRoutes = require('./modules/notifications/notification.routes');
 const systemRoutes = require('./modules/system/system.routes');
 
 const app = express();
+const server = http.createServer(app); // <-- ADD THIS
 
 // Global Middleware
 app.use(cors()); 
 app.use(express.json()); 
+
+
 
 // Import Routes
 const authRoutes = require('./modules/auth/auth.routes');
@@ -30,6 +35,10 @@ app.use('/api/system', systemRoutes);
 app.get('/', (req, res) => {
   res.send('Lectro API is running!');
 });
+
+
+// Initialize Socket.io
+socketUtil.init(server); // <-- ADD THIS
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

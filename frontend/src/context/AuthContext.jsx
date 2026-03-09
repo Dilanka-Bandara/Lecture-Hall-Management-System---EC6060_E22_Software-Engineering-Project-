@@ -1,12 +1,14 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import api from '../api/axios';
 import { jwtDecode } from 'jwt-decode';
+import { io } from 'socket.io-client'; // <-- ADD THIS
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [socket, setSocket] = useState(null); // <-- ADD THIS
 
   // Check if the user is already logged in when they open the app
   useEffect(() => {
@@ -19,6 +21,7 @@ export const AuthProvider = ({ children }) => {
           logout();
         } else {
           setUser(decodedUser);
+          connectSocket(decodedUser.id); // <-- ADD THIS
         }
       } catch (error) {
         logout();
@@ -26,6 +29,15 @@ export const AuthProvider = ({ children }) => {
     }
     setLoading(false);
   }, []);
+
+  // <-- ADD THIS FUNCTION
+  const connectSocket = (userId) => {
+    const newSocket = io('http://localhost:5000');
+    newSocket.on('connect', () => {
+      newSocket.emit('register', userId);
+    });
+    setSocket(newSocket);
+  };
 
   const login = async (email, password) => {
     try {
@@ -38,6 +50,7 @@ export const AuthProvider = ({ children }) => {
       // Decode the token to get the user's ID and Role
       const decodedUser = jwtDecode(token);
       setUser(decodedUser);
+      connectSocket(decodedUser.id); // <-- ADD THIS
       
       return decodedUser.role; // Return role so the Login page knows where to redirect them
     } catch (error) {
@@ -48,6 +61,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('lectro_token');
     setUser(null);
+    if (socket) socket.disconnect(); // <-- ADD THIS
   };
 
   return (
