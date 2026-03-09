@@ -1,17 +1,16 @@
 const db = require('../../config/db');
+const Notify = require('../../utils/notificationManager');
 
 const createSwapRequest = async (requestData) => {
   const [newRequestId] = await db('swap_requests').insert(requestData);
 
-  // NEW: Get the requester's name to personalize the notification
   const requester = await db('users').where({ id: requestData.requesting_lecturer_id }).first();
 
-  // NEW: Notify the Target Lecturer immediately
-  await db('notifications').insert({
-    user_id: requestData.target_lecturer_id,
-    title: 'New Swap Request',
-    message: `${requester.name} has requested to swap a lecture with you on ${requestData.proposed_date}. Please review in your pending requests.`
-  });
+  await Notify.sendToUser(
+    requestData.target_lecturer_id,
+    'New Swap Request',
+    `${requester.name} has requested to swap a lecture with you on ${requestData.proposed_date}. Please review in your pending requests.`
+  );
 
   return { id: newRequestId, ...requestData };
 };
@@ -46,29 +45,31 @@ const updateSwapStatus = async (swapId, role, status) => {
   const updateData = role === 'hod' ? { hod_status: status } : { target_lecturer_status: status };
   await db('swap_requests').where({ id: swapId }).update(updateData);
 
-  // NEW: Fetch full swap details needed for the notification text
+  // BUG FIX: Added t.subject_id to the select array so the student notification doesn't crash later
   const swapDetails = await db('swap_requests as sr')
     .join('timetables as t', 'sr.timetable_id', 't.id')
     .join('subjects as s', 't.subject_id', 's.id')
     .where('sr.id', swapId)
-    .select('sr.*', 's.subject_code')
+    .select('sr.*', 's.subject_code', 't.subject_id') 
     .first(); 
 
-  // --- NEW NOTIFICATION LOGIC ---
-
-  // 1. If Target Lecturer Responds: Notify the Original Requester
+  // 1. If Target Lecturer Responds
   if (role === 'lecturer') {
     const action = status === 'accepted' ? 'accepted' : 'rejected';
     const nextStep = status === 'accepted' ? ' It is now awaiting final HOD approval.' : '';
 
-    await db('notifications').insert({
-      user_id: swapDetails.requesting_lecturer_id,
-      title: `Swap Request ${status === 'accepted' ? 'Accepted' : 'Rejected'}`,
-      message: `Your swap request for ${swapDetails.subject_code} on ${swapDetails.proposed_date} was ${action} by the target lecturer.${nextStep}`
-    });
+    await Notify.sendToUser(
+      swapDetails.requesting_lecturer_id,
+      `Swap Request ${status === 'accepted' ? 'Accepted' : 'Rejected'}`,
+      `Your swap request for ${swapDetails.subject_code} on ${swapDetails.proposed_date} was ${action} by the target lecturer.${nextStep}`
+    );
+
+    if (status === 'accepted') {
+      await Notify.sendToRole('hod', 'Pending Swap Approval', `A new swap request for ${swapDetails.subject_code} requires your approval.`);
+    }
   }
 
-  // 2. If HOD Responds: Notify BOTH Lecturers
+  // 2. If HOD Responds
   if (role === 'hod') {
     const isApproved = status === 'accepted';
     const title = isApproved ? 'Swap Approved by HOD' : 'Swap Rejected by HOD';
@@ -76,13 +77,9 @@ const updateSwapStatus = async (swapId, role, status) => {
       ? `The HOD has APPROVED the swap for ${swapDetails.subject_code} on ${swapDetails.proposed_date}. The timetable is now updated.`
       : `The HOD has REJECTED the swap for ${swapDetails.subject_code} on ${swapDetails.proposed_date}.`;
 
-    // Notify both the requesting and target lecturers simultaneously
-    await db('notifications').insert([
-      { user_id: swapDetails.requesting_lecturer_id, title, message },
-      { user_id: swapDetails.target_lecturer_id, title, message }
-    ]);
+    await Notify.sendToUser(swapDetails.requesting_lecturer_id, title, message);
+    await Notify.sendToUser(swapDetails.target_lecturer_id, title, message);
 
-    // Original logic: Update Timetable and Notify Students if approved
     if (isApproved) {
       await db('timetables').where({ id: swapDetails.timetable_id }).update({
         date: swapDetails.proposed_date,
@@ -92,18 +89,12 @@ const updateSwapStatus = async (swapId, role, status) => {
         lecturer_id: swapDetails.target_lecturer_id
       });
 
-      const classInfo = await db('timetables').where({ id: swapDetails.timetable_id }).first();
-      const students = await db('student_subjects').where({ subject_id: classInfo.subject_id });
-      
-      const notifications = students.map(student => ({
-        user_id: student.student_id,
-        title: 'Class Rescheduled',
-        message: `Your class has been moved to ${swapDetails.proposed_date} at ${swapDetails.proposed_start_time}.`,
-      }));
-
-      if (notifications.length > 0) {
-        await db('notifications').insert(notifications);
-      }
+      // BUG FIX: swapDetails.subject_id is now correctly defined
+      await Notify.sendToEnrolledStudents(
+        swapDetails.subject_id,
+        'Class Rescheduled',
+        `Your class for ${swapDetails.subject_code} has been moved to ${swapDetails.proposed_date} at ${swapDetails.proposed_start_time.slice(0,5)}.`
+      );
     }
   }
 

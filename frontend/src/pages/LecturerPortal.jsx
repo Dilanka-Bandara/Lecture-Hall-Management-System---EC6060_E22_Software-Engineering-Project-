@@ -24,12 +24,14 @@ const generateFutureDates = () => {
 };
 
 const LecturerPortal = () => {
-  const { user, logout } = useAuth();
+  // FIXED: Consolidated useAuth destructuring to avoid duplicate declarations
+  const { user, logout, socket } = useAuth();
+  
   const [timetable, setTimetable] = useState([]);
   const [pendingSwaps, setPendingSwaps] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [systemData, setSystemData] = useState({ lecturers: [], halls: [], subjects: [] });
-
+  
   // Real-Time and Countdown States
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -57,6 +59,7 @@ const LecturerPortal = () => {
   const futureDateOptions = generateFutureDates();
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
+  // Initial Data Fetching
   useEffect(() => {
     fetchTimetable();
     fetchSystemData();
@@ -67,6 +70,26 @@ const LecturerPortal = () => {
     const timerId = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timerId);
   }, []);
+
+  // NEW: Real-Time Socket Listener
+  useEffect(() => {
+    if (socket) {
+      const handleNewNotification = (newNotif) => {
+        // Increment the unread badge instantly
+        setUnreadNotifCount(prev => prev + 1);
+        // Show the toast popup with the notification title
+        showNotification(newNotif.title || 'New Notification Received');
+      };
+
+      // Listen for the event emitted from the backend
+      socket.on('new_notification', handleNewNotification);
+
+      // Clean up the listener when the component unmounts
+      return () => {
+        socket.off('new_notification', handleNewNotification);
+      };
+    }
+  }, [socket]);
 
   const fetchUnreadNotifs = async () => {
     try {
@@ -167,7 +190,7 @@ const LecturerPortal = () => {
     ));
   };
 
-  // NEW: Bulk Attendance Actions
+  // Bulk Attendance Actions
   const markAllAttendance = (isPresent) => {
     setStudentsList(prev => prev.map(s => ({ ...s, is_present: isPresent })));
   };
@@ -206,7 +229,7 @@ const LecturerPortal = () => {
     return timetable;
   };
 
-  // NEW: Next Lecture Logic
+  // Next Lecture Logic
   const getNextLectureDetails = () => {
     if (!timetable.length) return null;
     
@@ -363,7 +386,7 @@ const LecturerPortal = () => {
                 </div>
               )}
 
-              {/* NEW: Countdown Widget */}
+              {/* Countdown Widget */}
               {nextLectureData && (
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -607,7 +630,7 @@ const LecturerPortal = () => {
                 <button onClick={() => setAttendanceModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><X className="w-5 h-5" /></button>
               </div>
 
-              {/* NEW: Search and Bulk Action Tools */}
+              {/* Search and Bulk Action Tools */}
               <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-4">
                 
                 {/* Visual Stat Summary */}
