@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { motion } from 'framer-motion';
 import { BookOpen } from 'lucide-react';
 
+import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import StudentPortal from './pages/StudentPortal';
 import LecturerPortal from './pages/LecturerPortal';
@@ -60,7 +61,8 @@ const App = () => {
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<Login />} />
           
           <Route path="/student-dashboard" element={
             <ProtectedRoute allowedRole="student">

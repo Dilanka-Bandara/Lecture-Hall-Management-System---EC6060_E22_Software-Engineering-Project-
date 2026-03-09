@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create a master instance pointing to your Node.js server
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: 'http://localhost:5001/api',
 });
 
 // Automatically attach the JWT token to every request if the user is logged in

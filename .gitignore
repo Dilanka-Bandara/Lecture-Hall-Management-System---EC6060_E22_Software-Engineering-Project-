@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+
+# environment files
+.env
+
+# mac system files
+.DS_Store
+
+# logs
+*.log
+
+# build files
+dist/
+build/
+
+# editor files
+.vscode/
