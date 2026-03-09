@@ -10,6 +10,7 @@ import LecturerPortal from './pages/LecturerPortal';
 import HODPortal from './pages/HODPortal';
 import TOPortal from './pages/TOPortal';
 import AdminPortal from './pages/AdminPortal';
+import ChatPage from "./pages/ChatPage";
 
 // Security Wrapper: Checks if user is logged in and has the right role [cite: 187]
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -71,6 +72,12 @@ const App = () => {
           <Route path="/lecturer-dashboard" element={
             <ProtectedRoute allowedRole="lecturer">
                 <LecturerPortal />
+            </ProtectedRoute>
+            } />
+
+          <Route path="/chat" element={
+            <ProtectedRoute allowedRole="lecturer">
+              <ChatPage />
             </ProtectedRoute>
             } />
 
