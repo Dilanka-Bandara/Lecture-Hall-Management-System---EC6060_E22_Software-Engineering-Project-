@@ -1,18 +1,6 @@
-# dependencies
 node_modules/
-
-# environment files
-.env
-
-# mac system files
-.DS_Store
-
-# logs
-*.log
-
-# build files
+frontend/node_modules/
+backend/node_modules/
 dist/
-build/
-
-# editor files
-.vscode/
+.env
+.vite
