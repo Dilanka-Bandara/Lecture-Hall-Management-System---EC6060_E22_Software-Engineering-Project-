@@ -4,6 +4,7 @@ import { getLecturers, getMessages, sendMessage } from "../services/chatService"
 import { useAuth } from "../context/AuthContext";
 
 const ChatPanel = ({ isOpen, onClose }) => {
+
   const { user } = useAuth();
   const senderId = user?.id;
 
@@ -13,14 +14,36 @@ const ChatPanel = ({ isOpen, onClose }) => {
   const [newMessage, setNewMessage] = useState("");
   const [showLecturers, setShowLecturers] = useState(false);
 
+  const [unreadSenders, setUnreadSenders] = useState([]);
+
   const messagesEndRef = useRef(null);
 
-  // Load lecturers when panel opens
+  // Load lecturers when chat opens
   useEffect(() => {
     if (isOpen) {
       loadLecturers();
     }
   }, [isOpen]);
+
+  // Check unread messages
+  useEffect(() => {
+
+    const checkUnread = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/chat/unread");
+        const data = await res.json();
+
+        setUnreadSenders(data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    const interval = setInterval(checkUnread, 4000);
+
+    return () => clearInterval(interval);
+
+  }, []);
 
   const loadLecturers = async () => {
     try {
@@ -31,13 +54,21 @@ const ChatPanel = ({ isOpen, onClose }) => {
     }
   };
 
-  // Load messages for selected lecturer
+  // Load messages when lecturer clicked
   const loadMessages = async (lecturer) => {
     try {
+
       const data = await getMessages(senderId, lecturer.id);
+
       setMessages(data);
       setSelectedLecturer(lecturer);
       setShowLecturers(false);
+
+      // remove unread dot
+      setUnreadSenders(prev =>
+        prev.filter(id => id !== lecturer.id)
+      );
+
     } catch (error) {
       console.error(error);
     }
@@ -45,9 +76,11 @@ const ChatPanel = ({ isOpen, onClose }) => {
 
   // Send message
   const handleSendMessage = async () => {
+
     if (!newMessage.trim()) return;
 
     try {
+
       await sendMessage({
         sender_id: senderId,
         receiver_id: selectedLecturer.id,
@@ -58,6 +91,7 @@ const ChatPanel = ({ isOpen, onClose }) => {
 
       const updated = await getMessages(senderId, selectedLecturer.id);
       setMessages(updated);
+
     } catch (error) {
       console.error(error);
     }
@@ -65,17 +99,21 @@ const ChatPanel = ({ isOpen, onClose }) => {
 
   // Auto refresh messages
   useEffect(() => {
+
     if (!selectedLecturer) return;
 
     const interval = setInterval(async () => {
+
       const updated = await getMessages(senderId, selectedLecturer.id);
       setMessages(updated);
+
     }, 3000);
 
     return () => clearInterval(interval);
+
   }, [selectedLecturer]);
 
-  // Auto scroll to newest message
+  // Auto scroll to latest message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -97,7 +135,7 @@ const ChatPanel = ({ isOpen, onClose }) => {
         </button>
       </div>
 
-      {/* Lecturer List Toggle */}
+      {/* Lecturer dropdown */}
       <div
         onClick={() => setShowLecturers(!showLecturers)}
         className="p-3 border-b border-slate-700 cursor-pointer flex justify-between text-sm text-white"
@@ -106,70 +144,92 @@ const ChatPanel = ({ isOpen, onClose }) => {
         <span>{showLecturers ? "▲" : "▼"}</span>
       </div>
 
-      {/* Lecturer List */}
+      {/* Lecturer list */}
       {showLecturers && (
         <div className="max-h-40 overflow-y-auto border-b border-slate-700">
+
           {lecturers.map((lecturer) => (
+
             <div
               key={lecturer.id}
               onClick={() => loadMessages(lecturer)}
-              className="p-2 hover:bg-slate-800 cursor-pointer text-sm text-white"
+              className="flex justify-between items-center p-2 hover:bg-slate-800 cursor-pointer text-sm text-white"
             >
-              {lecturer.name}
+
+              <span>{lecturer.name}</span>
+
+              {unreadSenders.includes(lecturer.id) && (
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+              )}
+
             </div>
+
           ))}
+
         </div>
       )}
 
-      {/* Messages Area */}
+      {/* Messages */}
       <div className="flex-1 p-3 overflow-y-auto space-y-2">
 
         {selectedLecturer ? (
           <>
+
             <div className="text-sm font-semibold text-white mb-2">
               Chat with {selectedLecturer.name}
             </div>
 
             {messages.map((msg) => (
-                <div
-                    key={msg.id}
-                    className={`flex ${
-                    msg.sender_id === senderId ? "justify-end" : "justify-start"
-                    }`}
-                >
-                    <div
-                    className={`px-3 py-2 rounded-lg text-sm max-w-[70%] ${
-                        msg.sender_id === senderId
-                        ? "bg-indigo-600 text-white"
-                        : "bg-slate-700 text-white"
-                    }`}
-                    >
-                    <div>{msg.message}</div>
 
-                    <div className="text-[10px] text-gray-300 mt-1 text-right">
-                        {msg.created_at
-                        ? new Date(msg.created_at).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            })
-                        : ""}
-                    </div>
-                    </div>
+              <div
+                key={msg.id}
+                className={`flex ${
+                  msg.sender_id === senderId
+                    ? "justify-end"
+                    : "justify-start"
+                }`}
+              >
+
+                <div
+                  className={`px-3 py-2 rounded-lg text-sm max-w-[70%] ${
+                    msg.sender_id === senderId
+                      ? "bg-indigo-600 text-white"
+                      : "bg-slate-700 text-white"
+                  }`}
+                >
+
+                  <div>{msg.message}</div>
+
+                  <div className="text-[10px] text-gray-300 mt-1 text-right">
+                    {msg.created_at
+                      ? new Date(msg.created_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : ""}
+                  </div>
+
                 </div>
-                ))}
+
+              </div>
+
+            ))}
 
             <div ref={messagesEndRef}></div>
+
           </>
         ) : (
           <div className="text-sm text-slate-400">
             Select a lecturer to start chatting
           </div>
         )}
+
       </div>
 
-      {/* Message Input */}
+      {/* Message input */}
       {selectedLecturer && (
         <div className="p-3 border-t border-slate-700 flex gap-2">
+
           <input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
@@ -188,8 +248,10 @@ const ChatPanel = ({ isOpen, onClose }) => {
           >
             Send
           </button>
+
         </div>
       )}
+
     </div>
   );
 };
