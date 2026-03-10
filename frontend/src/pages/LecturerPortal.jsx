@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Bell, LogOut, MapPin, AlertTriangle, RefreshCw, X, CheckCircle, BookOpen, UserCheck, Filter, Clock, Hourglass, Search, CheckSquare, Square } from 'lucide-react';
+import { Calendar, Bell, LogOut, MapPin, AlertTriangle, RefreshCw, X, CheckCircle, BookOpen, UserCheck, Filter, Clock, Hourglass, Search, CheckSquare, Square,MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationPanel from '../components/NotificationPanel';
+import { useNavigate } from "react-router-dom";
+import ChatPanel from "../components/ChatPanel";
 
 // Helper function to generate the next 60 valid dates cleanly
 const generateFutureDates = () => {
   const dates = [];
   const today = new Date();
+
   
   for (let i = 0; i <= 60; i++) {
     const d = new Date();
@@ -29,6 +32,9 @@ const LecturerPortal = () => {
   const [pendingSwaps, setPendingSwaps] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [systemData, setSystemData] = useState({ lecturers: [], halls: [], subjects: [] });
+  const navigate = useNavigate();
+  const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
+  const [hasUnreadChat, setHasUnreadChat] = useState(false);
 
   // Real-Time and Countdown States
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -58,15 +64,44 @@ const LecturerPortal = () => {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   useEffect(() => {
-    fetchTimetable();
-    fetchSystemData();
-    fetchPendingSwaps(); 
-    fetchUnreadNotifs();
 
-    // Real-time clock interval
-    const timerId = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timerId);
-  }, []);
+  const checkMessages = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/chat/lecturers");
+      const data = await res.json();
+
+      if (data && data.length > 0) {
+        setHasUnreadChat(true);
+      }
+
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // run immediately
+  checkMessages();
+
+  // check every 5 seconds
+  const interval = setInterval(checkMessages, 5000);
+
+  return () => clearInterval(interval);
+
+}, []);
+useEffect(() => {
+  fetchTimetable();
+  fetchSystemData();
+  fetchPendingSwaps(); 
+  fetchUnreadNotifs();
+
+  const timerId = setInterval(() => setCurrentTime(new Date()), 1000);
+
+  return () => clearInterval(timerId);
+
+}, []);
+   
+
+  
 
   const fetchUnreadNotifs = async () => {
     try {
@@ -286,6 +321,22 @@ const LecturerPortal = () => {
                 )}
               </div>
               Notifications
+            </button>
+            <button
+              onClick={() => {
+                setIsChatPanelOpen(true);
+                setHasUnreadChat(false);
+              }}
+              className="w-full flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white rounded-md text-sm font-medium transition-colors"
+            >
+              <div className="relative flex items-center gap-2">
+                <MessageCircle className="w-4 h-4" />
+                Chat
+
+                {hasUnreadChat && (
+                  <span className="absolute -right-2 top-0 w-2 h-2 bg-green-500 rounded-full"></span>
+                )}
+              </div>
             </button>
           </nav>
         </div>
@@ -738,6 +789,10 @@ const LecturerPortal = () => {
         isOpen={isNotifPanelOpen} 
         onClose={() => setIsNotifPanelOpen(false)} 
         onNotificationsUpdate={(count) => setUnreadNotifCount(count)} 
+      />
+      <ChatPanel 
+        isOpen={isChatPanelOpen}
+        onClose={() => setIsChatPanelOpen(false)}
       />
 
     </div>
