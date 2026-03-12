@@ -22,7 +22,9 @@ const loginUser = async (email, password) => {
     { 
       id: user.id, 
       role: user.role, 
-      university_id: user.university_id 
+      university_id: user.university_id, // <-- ADDED MISSING COMMA HERE
+      name: user.name,                   // <-- ADDED THIS
+      batch: user.batch                  // <-- ADDED THIS
     },
     process.env.JWT_SECRET,
     { expiresIn: '8h' } // Token expires in 8 hours

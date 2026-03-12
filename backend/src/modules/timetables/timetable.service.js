@@ -139,6 +139,82 @@ const getStudentAttendanceMetrics = async (studentId) => {
   });
 };
 
+// --- NEW BATCH GENERATOR FOR PERMANENT TIMETABLES ---
+// --- NEW BATCH GENERATOR FOR PERMANENT TIMETABLES ---
+const createRecurringSchedule = async (scheduleData) => {
+  const { 
+    subject_id, 
+    lecturer_id, 
+    hall_id, 
+    start_time, 
+    end_time, 
+    day_of_week, 
+    start_date,  
+    end_date,
+    target_batch // NEW: The student year to automatically enroll
+  } = scheduleData;
+
+  // 1. Generate the Timetable Dates
+  let currentDate = new Date(start_date);
+  const endDateObj = new Date(end_date);
+  const recordsToInsert = [];
+
+  while (currentDate <= endDateObj) {
+    if (currentDate.getDay() === parseInt(day_of_week)) {
+      recordsToInsert.push({
+        date: currentDate.toISOString().split('T')[0],
+        start_time,
+        end_time,
+        subject_id,
+        hall_id,
+        lecturer_id
+      });
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  if (recordsToInsert.length === 0) {
+    throw new Error("No dates match the selected day of the week in this date range.");
+  }
+
+  // 2. Insert the timetable records
+  await db('timetables').insert(recordsToInsert);
+
+  // 3. NEW: Auto-Enroll the Students
+  let enrolledCount = 0;
+  if (target_batch) {
+    // Find all users who are students in the selected batch
+    const students = await db('users')
+      .where({ role: 'student', batch: target_batch })
+      .select('id');
+      
+    if (students.length > 0) {
+      // Format data for bulk insertion
+      const enrollmentRecords = students.map(student => ({
+        student_id: student.id,
+        subject_id: subject_id
+      }));
+
+      // Insert enrollments. .ignore() prevents crashing if a student is already enrolled in this subject.
+      await db('student_subjects')
+        .insert(enrollmentRecords)
+        .onConflict(['student_id', 'subject_id'])
+        .ignore();
+        
+      enrolledCount = students.length;
+    }
+  }
+  
+  return { 
+    success: true, 
+    message: `Generated ${recordsToInsert.length} classes and auto-enrolled ${enrolledCount} students from ${target_batch}.` 
+  };
+};
+
+
+
+
+// DON'T FORGET to add it to your module.exports at the bottom!
 module.exports = {
   getTimetableForStudent,
   getTimetableForLecturer,
@@ -147,5 +223,7 @@ module.exports = {
   getAllSchedules,
   createSchedule,
   deleteSchedule,
-  getStudentAttendanceMetrics
+  getStudentAttendanceMetrics,
+  createRecurringSchedule // <-- Add this
 };
+

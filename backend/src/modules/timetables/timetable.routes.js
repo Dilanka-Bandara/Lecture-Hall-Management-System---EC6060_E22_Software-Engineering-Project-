@@ -17,7 +17,7 @@ router.get(
 router.get(
   '/:timetableId/students',
   verifyToken,
-  authorizeRoles('hod'),
+  authorizeRoles('hod', 'lecturer'),
   timetableController.getStudentsForClass
 );
 
@@ -26,9 +26,10 @@ router.get(
 router.post(
   '/:timetableId/attendance',
   verifyToken,
-  authorizeRoles('hod'),
+  authorizeRoles('hod', 'lecturer'),
   timetableController.markAttendance
 );
+
 
 // --- NEW HOD ROUTES ---
 
@@ -40,6 +41,9 @@ router.post('/department/new', verifyToken, authorizeRoles('hod', 'admin'), time
 
 // HOD deletes a schedule
 router.delete('/department/:id', verifyToken, authorizeRoles('hod', 'admin'), timetableController.removeSchedule);
+
+// HOD generates a bulk recurring semester schedule
+router.post('/department/recurring', verifyToken, authorizeRoles('hod', 'admin'), timetableController.addRecurringSchedule);
 
 // GET /api/timetables/my-attendance
 router.get(

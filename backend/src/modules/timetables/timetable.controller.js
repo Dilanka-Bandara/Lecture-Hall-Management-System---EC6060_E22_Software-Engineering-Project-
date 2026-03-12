@@ -81,6 +81,17 @@ const getMyAttendance = async (req, res) => {
   }
 };
 
+// Add this near your other HOD controllers
+
+const addRecurringSchedule = async (req, res) => {
+  try {
+    const result = await timetableService.createRecurringSchedule(req.body);
+    res.status(201).json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message || 'Failed to generate recurring schedule. Check inputs.' });
+  }
+};
+
 // Update your module.exports to include getMyAttendance!
 
 // Update exports
@@ -91,7 +102,8 @@ module.exports = {
   getDepartmentSchedules,
   addSchedule,
   removeSchedule,
-  getMyAttendance
+  getMyAttendance,
+  addRecurringSchedule
 
 };
 
